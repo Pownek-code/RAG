@@ -1,0 +1,24 @@
+[project]
+name = "rag-against-the-machine"
+version = "0.1.0"
+description = "A retrieval-augmented generation system for answering questions about a codebase."
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "fire>=0.7.1",
+    "pydantic>=2.13.5",
+    "tqdm>=4.70.1",
+]
+
+[dependency-groups]
+dev = [
+    "flake8>=7.3.0",
+    "mypy>=2.3.1",
+    "pytest>=9.1.1",
+]
+
+[tool.mypy]
+exclude = [
+    "^data/",
+    "^\\.venv/",
+]

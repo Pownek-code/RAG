@@ -1,1 +1,31 @@
-vllm-0.10.1
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.flake8_cache/
+
+# Virtual environments
+.venv/
+venv/
+
+# Environment variables and secrets
+.env
+.env.*
+
+# Project data supplied or generated during evaluation
+data/raw/
+data/datasets/
+data/processed/
+data/output/
+
+# Model files
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# Operating system and editor files
+.DS_Store
+.vscode/
+.idea/
