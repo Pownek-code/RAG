@@ -1,6 +1,8 @@
 from pathlib import Path
+import logging
 from src.ingestion.file_types import DOCUMENT_TYPE_BY_EXTENSION
 from src.ingestion.models import LoadedDocument
+logger = logging.getLogger(__name__)
 
 
 class CorpusLoader:
@@ -12,9 +14,28 @@ class CorpusLoader:
         corpus_directory = corpus_directory.resolve()
         project_root = project_root.resolve()
 
-        documents: list[LoadedDocument] = []
+        if not corpus_directory.exists():
+            raise FileNotFoundError(
+                f"Corpus directory does not exist: {corpus_directory}"
+            )
 
+        if not corpus_directory.is_dir():
+            raise NotADirectoryError(
+                f"Corpus path is not a directory: {corpus_directory}"
+            )
+
+        try:
+            corpus_directory.relative_to(project_root)
+        except ValueError as error:
+            raise ValueError(
+                "Corpus directory must be inside the project root"
+            ) from error
+
+        documents: list[LoadedDocument] = []
         for file_path in sorted(corpus_directory.rglob("*")):
+            if file_path.is_symlink():
+                continue
+
             if not file_path.is_file():
                 continue
 
@@ -24,14 +45,26 @@ class CorpusLoader:
             if document_type is None:
                 continue
 
-            with file_path.open(
-                mode="r",
-                encoding="utf-8",
-                newline="",
-            ) as source_file:
-                content = source_file.read()
+            try:
+                with file_path.open(
+                    mode="r",
+                    encoding="utf-8",
+                    newline="",
+                ) as source_file:
+                    content = source_file.read()
+            except (OSError, UnicodeDecodeError) as error:
+                logger.warning(
+                    "Skipping unreadable file %s: %s",
+                    file_path,
+                    error,
+                )
+                continue
 
-            relative_path = file_path.relative_to(project_root).as_posix()
+            if not content:
+                continue
+
+            relative_path = file_path.relative_to(
+                project_root).as_posix()
 
             document = LoadedDocument(
                 file_path=relative_path,
@@ -40,5 +73,4 @@ class CorpusLoader:
             )
 
             documents.append(document)
-
         return documents
