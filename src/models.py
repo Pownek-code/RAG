@@ -80,3 +80,7 @@ class SourceChunk(BaseModel):
             )
 
         return self
+
+class RankedChunk(BaseModel):
+    chunk: SourceChunk
+    score: float
