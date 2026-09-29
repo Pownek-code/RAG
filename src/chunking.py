@@ -2,7 +2,9 @@ from abc import ABC, abstractmethod
 
 from src.ingestion.models import LoadedDocument
 from src.models import SourceChunk
-
+import ast
+import re
+from abc import ABC, abstractmethod
 
 class Chunker(ABC):
     MAXIMUM_CHUNK_SIZE = 2000
@@ -144,3 +146,86 @@ class Chunker(ABC):
         Return preferred end-exclusive character boundaries.
         """
         raise NotImplementedError
+
+class PythonChunker(Chunker):
+    SECTION_NODES = (
+        ast.FunctionDef,
+        ast.AsyncFunctionDef,
+        ast.ClassDef,
+    )
+
+    def _find_section_boundaries(
+        self,
+        text: str,
+    ) -> list[int]:
+        try:
+            syntax_tree = ast.parse(text)
+        except SyntaxError:
+            return []
+
+        line_end_offsets = (
+            self._find_line_end_offsets(text)
+        )
+        boundaries: set[int] = set()
+
+        for node in ast.walk(syntax_tree):
+            if not isinstance(
+                node,
+                self.SECTION_NODES,
+            ):
+                continue
+
+            if node.end_lineno is None:
+                continue
+
+            line_index = node.end_lineno - 1
+
+            if line_index < len(line_end_offsets):
+                boundaries.add(
+                    line_end_offsets[line_index]
+                )
+
+        return sorted(boundaries)
+
+    @staticmethod
+    def _find_line_end_offsets(
+        text: str,
+    ) -> list[int]:
+        offsets: list[int] = []
+        current_offset = 0
+
+        for line in text.splitlines(keepends=True):
+            current_offset += len(line)
+            offsets.append(current_offset)
+
+        return offsets
+
+class DocumentationChunker(Chunker):
+    HEADING_PATTERN = re.compile(
+        r"(?m)^[ \t]{0,3}#{1,6}[ \t]+.+$"
+    )
+    PARAGRAPH_BREAK_PATTERN = re.compile(
+        r"\r?\n[ \t]*\r?\n"
+    )
+
+    def _find_section_boundaries(
+        self,
+        text: str,
+    ) -> list[int]:
+        boundaries: set[int] = set()
+
+        for heading in self.HEADING_PATTERN.finditer(
+            text
+        ):
+            boundaries.add(heading.start())
+
+        for paragraph_break in (
+            self.PARAGRAPH_BREAK_PATTERN.finditer(
+                text
+            )
+        ):
+            boundaries.add(
+                paragraph_break.end()
+            )
+
+        return sorted(boundaries)

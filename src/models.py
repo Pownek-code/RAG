@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, model_validator
 import uuid
 from typing import List
-from ingestion.file_types import DocumentType
+from src.ingestion.file_types import DocumentType
 
 
 class MinimalSource(BaseModel):
