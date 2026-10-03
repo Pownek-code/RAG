@@ -5,9 +5,24 @@ from src.ingestion.file_types import DocumentType
 
 
 class MinimalSource(BaseModel):
-    file_path: str
-    first_character_index: int
-    last_character_index: int
+    file_path: str = Field(min_length=1)
+    first_character_index: int = Field(ge=0)
+    last_character_index: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def validate_character_range(
+        self,
+    ) -> "MinimalSource":
+        if (
+            self.last_character_index
+            <= self.first_character_index
+        ):
+            raise ValueError(
+                "last_character_index must be greater "
+                "than first_character_index"
+            )
+
+        return self
 
 
 class UnansweredQuestion(BaseModel):
@@ -18,12 +33,16 @@ class UnansweredQuestion(BaseModel):
 
 
 class AnsweredQuestion(UnansweredQuestion):
-    sources: List[MinimalSource]
+    sources: List[MinimalSource] = Field(
+        min_length=1
+    )
     answer: str
 
 
 class RagDataset(BaseModel):
-    rag_questions: List[AnsweredQuestion | UnansweredQuestion]
+    rag_questions: list[
+        AnsweredQuestion | UnansweredQuestion
+    ] = Field(min_length=1)
 
 
 class MinimalSearchResults(BaseModel):
@@ -37,13 +56,34 @@ class MinimalAnswer(MinimalSearchResults):
 
 
 class StudentSearchResults(BaseModel):
-    search_results: List[MinimalSearchResults]
-    k: int
+    search_results: list[
+        MinimalSearchResults
+    ] = Field(min_length=1)
+    k: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def validate_unique_question_ids(
+        self,
+    ) -> "StudentSearchResults":
+        question_ids = [
+            result.question_id
+            for result in self.search_results
+        ]
+
+        if len(question_ids) != len(set(question_ids)):
+            raise ValueError(
+                "Search results contain duplicate "
+                "question IDs"
+            )
+
+        return self
 
 
 class StudentSearchResultsAndAnswer(BaseModel):
-    search_results: List[MinimalAnswer]
-    k: int
+    search_results: list[
+        MinimalAnswer
+    ] = Field(min_length=1)
+    k: int = Field(gt=0)
 
 
 class SourceChunk(BaseModel):
@@ -84,3 +124,20 @@ class SourceChunk(BaseModel):
 class RankedChunk(BaseModel):
     chunk: SourceChunk
     score: float
+
+class AnsweredDataset(BaseModel):
+    rag_questions: list[AnsweredQuestion] = Field(
+        min_length=1
+    )
+    @model_validator(mode="after")
+    def validate_unique_questions_id(self) -> "AnsweredDataset":
+        question_ids = [
+            question.question_id
+            for question in self.rag_questions
+        ]
+        if len(question_ids) != len(set(question_ids)):
+            raise ValueError(
+                "Dataset contains duplicate question IDs"
+            )
+
+        return self
