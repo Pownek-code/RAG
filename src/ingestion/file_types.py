@@ -1,3 +1,5 @@
+"""File extensions that are ingested and their document types."""
+
 from src.ingestion.models import DocumentType
 
 

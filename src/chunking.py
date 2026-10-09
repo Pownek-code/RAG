@@ -1,18 +1,35 @@
-from abc import ABC, abstractmethod
+"""Structure-aware splitting of documents into bounded chunks."""
 
-from src.ingestion.models import LoadedDocument
-from src.models import SourceChunk
 import ast
 import re
 from abc import ABC, abstractmethod
 
+from src.ingestion.models import LoadedDocument
+from src.models import SourceChunk
+
+
 class Chunker(ABC):
+    """Splits a document into chunks of bounded size.
+
+    Chunks are contiguous, never overlap and cover the whole document.
+    Subclasses only decide where the preferred split points are; this
+    class applies the size limit and falls back to line breaks.
+    """
+
     MAXIMUM_CHUNK_SIZE = 2000
 
     def __init__(
         self,
         max_chunk_size: int = MAXIMUM_CHUNK_SIZE,
     ) -> None:
+        """Configure the chunk size limit.
+
+        Args:
+            max_chunk_size: Maximum chunk length in characters.
+
+        Raises:
+            ValueError: If the size is not between 1 and 2000.
+        """
         if max_chunk_size <= 0:
             raise ValueError(
                 "max_chunk_size must be greater than zero"
@@ -29,6 +46,17 @@ class Chunker(ABC):
         self,
         document: LoadedDocument,
     ) -> list[SourceChunk]:
+        """Split a document into chunks.
+
+        Each chunk ends at the last preferred boundary that fits within the
+        size limit, so a chunk never exceeds ``max_chunk_size``.
+
+        Args:
+            document: The document to split.
+
+        Returns:
+            Chunks in document order; empty for an empty document.
+        """
         text = document.content
 
         if not text:
@@ -67,6 +95,7 @@ class Chunker(ABC):
         self,
         text: str,
     ) -> list[int]:
+        """Return sorted, valid boundaries, always ending at the text end."""
         discovered_boundaries = (
             self._find_section_boundaries(text)
         )
@@ -88,6 +117,11 @@ class Chunker(ABC):
         start: int,
         maximum_end: int,
     ) -> int:
+        """Pick the farthest boundary that keeps the chunk within the limit.
+
+        Falls back to a line break, or to a hard cut, when no preferred
+        boundary fits.
+        """
         possible_boundaries = [
             boundary
             for boundary in boundaries
@@ -109,6 +143,11 @@ class Chunker(ABC):
         start: int,
         maximum_end: int,
     ) -> int:
+        """Return the end of the last full line within the limit.
+
+        Returns ``maximum_end`` when the text ends there or when the chunk
+        contains no line break after its first character.
+        """
         if maximum_end == len(text):
             return maximum_end
 
@@ -129,6 +168,7 @@ class Chunker(ABC):
         start: int,
         end: int,
     ) -> SourceChunk:
+        """Build the chunk covering ``text[start:end]``."""
         return SourceChunk(
             file_path=document.file_path,
             content=document.content[start:end],
@@ -147,7 +187,10 @@ class Chunker(ABC):
         """
         raise NotImplementedError
 
+
 class PythonChunker(Chunker):
+    """Prefers to split Python code after functions and classes."""
+
     SECTION_NODES = (
         ast.FunctionDef,
         ast.AsyncFunctionDef,
@@ -158,6 +201,11 @@ class PythonChunker(Chunker):
         self,
         text: str,
     ) -> list[int]:
+        """Return the end offset of every function and class.
+
+        Files that do not parse yield no boundaries, so they are split on
+        line breaks instead.
+        """
         try:
             syntax_tree = ast.parse(text)
         except SyntaxError:
@@ -191,6 +239,7 @@ class PythonChunker(Chunker):
     def _find_line_end_offsets(
         text: str,
     ) -> list[int]:
+        """Return the offset just after each line, in order."""
         offsets: list[int] = []
         current_offset = 0
 
@@ -200,7 +249,10 @@ class PythonChunker(Chunker):
 
         return offsets
 
+
 class DocumentationChunker(Chunker):
+    """Prefers to split Markdown and text at headings and paragraphs."""
+
     HEADING_PATTERN = re.compile(
         r"(?m)^[ \t]{0,3}#{1,6}[ \t]+.+$"
     )
@@ -212,6 +264,7 @@ class DocumentationChunker(Chunker):
         self,
         text: str,
     ) -> list[int]:
+        """Return heading starts and the end of every blank line."""
         boundaries: set[int] = set()
 
         for heading in self.HEADING_PATTERN.finditer(

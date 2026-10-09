@@ -1,3 +1,5 @@
+"""Retrieval of source locations for a question."""
+
 from src.indexing import BM25Index
 from src.models import (
     MinimalSearchResults,
@@ -8,7 +10,10 @@ from src.models import (
 
 
 class QuestionRetriever:
+    """Turns a question into ranked source locations."""
+
     def __init__(self, index: BM25Index) -> None:
+        """Store the index that is searched."""
         self._index = index
 
     def search(
@@ -16,6 +21,15 @@ class QuestionRetriever:
         question: UnansweredQuestion,
         k: int,
     ) -> MinimalSearchResults:
+        """Retrieve the top-k sources for a question.
+
+        Args:
+            question: The question to search for.
+            k: Number of sources to return.
+
+        Returns:
+            The question with its retrieved sources, best first.
+        """
         ranked_chunks = self._index.search(
             query=question.question,
             top_k=k,
@@ -36,6 +50,11 @@ class QuestionRetriever:
     def _to_minimal_source(
         ranked_chunk: RankedChunk,
     ) -> MinimalSource:
+        """Convert a ranked chunk into a source location.
+
+        Raises:
+            ValueError: If the chunk exceeds the 2000 character limit.
+        """
         chunk = ranked_chunk.chunk
 
         source_length = (

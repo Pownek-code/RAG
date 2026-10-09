@@ -1,3 +1,5 @@
+"""Command-line interface of the RAG system (Python Fire)."""
+
 from pathlib import Path
 
 import fire
@@ -35,6 +37,13 @@ from src.tokenization import CodeAwareTokenizer
 
 
 class CLI:
+    """Commands exposed as ``uv run python -m src <command>``.
+
+    Every command returns a string that Fire prints. Expected failures
+    (bad input, missing files, model problems) are returned as
+    ``Error: ...`` messages instead of raising tracebacks.
+    """
+
     _DEFAULT_INDEX_DIRECTORY = (
         "data/processed/bm25"
     )
@@ -49,6 +58,16 @@ class CLI:
             _DEFAULT_INDEX_DIRECTORY
         ),
     ) -> str:
+        """Chunk the corpus and build the persistent BM25 index.
+
+        Args:
+            max_chunk_size: Maximum chunk length in characters (at most 2000).
+            repository_path: Directory containing the corpus to ingest.
+            index_directory: Directory where the index is saved.
+
+        Returns:
+            A completion message, or an ``Error: ...`` message.
+        """
         try:
             project_root = Path.cwd()
 
@@ -112,6 +131,16 @@ class CLI:
             _DEFAULT_INDEX_DIRECTORY
         ),
     ) -> str:
+        """Return the top-k sources for a single query as JSON.
+
+        Args:
+            query: The question to search for.
+            k: Number of sources to return.
+            index_directory: Directory containing the saved index.
+
+        Returns:
+            ``MinimalSearchResults`` JSON, or an ``Error: ...`` message.
+        """
         try:
             question_retriever = (
                 self._create_question_retriever(
@@ -148,6 +177,18 @@ class CLI:
             _DEFAULT_INDEX_DIRECTORY
         ),
     ) -> str:
+        """Search every question of a dataset and save the results.
+
+        Args:
+            dataset_path: JSON dataset of questions.
+            k: Number of sources to retrieve per question.
+            save_directory: Directory receiving the results file, which
+                keeps the dataset's file name.
+            index_directory: Directory containing the saved index.
+
+        Returns:
+            A message with the output path, or an ``Error: ...`` message.
+        """
         try:
             question_retriever = (
                 self._create_question_retriever(
@@ -203,6 +244,20 @@ class CLI:
         max_new_tokens: int = 160,
         device: str | None = None,
     ) -> str:
+        """Answer a single question from its retrieved sources.
+
+        Args:
+            query: The question to answer.
+            k: Number of sources to retrieve as context.
+            index_directory: Directory containing the saved index.
+            model_name: Hugging Face name of the generation model.
+            max_context_tokens: Token budget for the retrieved context.
+            max_new_tokens: Maximum number of generated tokens.
+            device: ``cuda``, ``mps`` or ``cpu``; detected when omitted.
+
+        Returns:
+            ``MinimalAnswer`` JSON, or an ``Error: ...`` message.
+        """
         try:
             question_retriever = (
                 self._create_question_retriever(
@@ -244,6 +299,20 @@ class CLI:
         max_new_tokens: int = 160,
         device: str | None = None,
     ) -> str:
+        """Generate answers for an existing search results file.
+
+        Args:
+            student_search_results_path: Output of ``search_dataset``.
+            save_directory: Directory receiving the answers file, which
+                keeps the input file name.
+            model_name: Hugging Face name of the generation model.
+            max_context_tokens: Token budget for the retrieved context.
+            max_new_tokens: Maximum number of generated tokens.
+            device: ``cuda``, ``mps`` or ``cpu``; detected when omitted.
+
+        Returns:
+            A message with the output path, or an ``Error: ...`` message.
+        """
         try:
             dataset_answerer = DatasetAnswerer(
                 answer_service=self._create_answer_service(
@@ -280,6 +349,15 @@ class CLI:
         student_search_results_path: str,
         dataset_path: str,
     ) -> str:
+        """Report recall@k of search results against ground truth.
+
+        Args:
+            student_search_results_path: Output of ``search_dataset``.
+            dataset_path: Dataset with the reference sources.
+
+        Returns:
+            The recall value, or an ``Error: ...`` message.
+        """
         try:
             json_file_reader = JsonFileReader()
 
@@ -332,6 +410,10 @@ class CLI:
         max_new_tokens: int,
         device: str | None,
     ) -> AnswerService:
+        """Build the answer service with a Qwen generator.
+
+        The model itself is only loaded when the first answer is generated.
+        """
         return AnswerService(
             context_loader=SourceContextLoader(
                 file_reader=FileReader(),
@@ -349,6 +431,7 @@ class CLI:
     def _create_question_retriever(
         index_directory: Path,
     ) -> QuestionRetriever:
+        """Load the saved BM25 index and wrap it in a retriever."""
         tokenizer = CodeAwareTokenizer()
 
         index = BM25Index.load(

@@ -1,3 +1,5 @@
+"""Discovery and loading of corpus files."""
+
 import logging
 from pathlib import Path
 
@@ -9,7 +11,13 @@ logger = logging.getLogger(__name__)
 
 
 class FileReader:
+    """Reads text files without altering line endings."""
+
     def read(self, file_path: Path) -> str:
+        """Return the exact text of a UTF-8 file.
+
+        Line endings are kept as written, so character offsets stay valid.
+        """
         with file_path.open(
             mode="r",
             encoding="utf-8",
@@ -19,7 +27,10 @@ class FileReader:
 
 
 class RepositoryLoader:
+    """Loads the supported files of a repository."""
+
     def __init__(self, file_reader: FileReader) -> None:
+        """Store the reader used to open files."""
         self.file_reader = file_reader
 
     def load(
@@ -27,6 +38,21 @@ class RepositoryLoader:
         repository_path: Path,
         project_root: Path,
     ) -> list[LoadedDocument]:
+        """Load every supported, readable, non-empty file.
+
+        Args:
+            repository_path: Directory to scan recursively.
+            project_root: Root that returned file paths are relative to.
+
+        Returns:
+            Documents sorted by path. Unreadable files are skipped with a
+            warning.
+
+        Raises:
+            FileNotFoundError: If the repository or root does not exist.
+            NotADirectoryError: If either path is not a directory.
+            ValueError: If the repository is outside the project root.
+        """
         repository = repository_path.resolve()
         project_root = project_root.resolve()
 
@@ -59,6 +85,7 @@ class RepositoryLoader:
         repository: Path,
         project_root: Path,
     ) -> None:
+        """Check both paths exist and the repository is in the root."""
         if not repository.exists():
             raise FileNotFoundError(
                 f"Repository does not exist: {repository}"
@@ -90,6 +117,7 @@ class RepositoryLoader:
     def _discover_files(
         repository: Path,
     ) -> list[Path]:
+        """Return all regular files, sorted, ignoring symbolic links."""
         files = []
 
         for file_path in repository.rglob("*"):
@@ -105,6 +133,7 @@ class RepositoryLoader:
     def _get_document_type(
         file_path: Path,
     ) -> DocumentType | None:
+        """Return the type for a file extension, or ``None``."""
         extension = file_path.suffix.lower()
 
         return DOCUMENT_TYPE_BY_EXTENSION.get(extension)
@@ -115,6 +144,7 @@ class RepositoryLoader:
         project_root: Path,
         document_type: DocumentType,
     ) -> LoadedDocument | None:
+        """Read one file; return ``None`` if unreadable or empty."""
         try:
             content = self.file_reader.read(file_path)
         except (OSError, UnicodeDecodeError) as error:
