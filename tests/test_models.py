@@ -63,7 +63,13 @@ def test_rag_dataset_accepts_answered_and_unanswered_questions() -> None:
     answered = AnsweredQuestion(
         question_id="question-2",
         question="What is caching?",
-        sources=[],
+        sources=[
+            MinimalSource(
+                file_path="docs/caching.md",
+                first_character_index=0,
+                last_character_index=10,
+            )
+        ],
         answer="Caching stores reusable results.",
     )
 

@@ -2,6 +2,11 @@ from pathlib import Path
 
 import fire
 
+from src.answering import (
+    AnswersWriter,
+    AnswerService,
+    DatasetAnswerer,
+)
 from src.chunking import (
     Chunker,
     DocumentationChunker,
@@ -15,6 +20,7 @@ from src.dataset import (
     SearchResultsWriter,
 )
 from src.evaluation import RetrievalEvaluator
+from src.generation import MODEL_NAME, QwenAnswerGenerator
 from src.index_pipeline import IndexingPipeline
 from src.indexing import BM25Index
 from src.ingestion.loader import (
@@ -24,6 +30,7 @@ from src.ingestion.loader import (
 from src.ingestion.models import DocumentType
 from src.models import UnansweredQuestion
 from src.retrieval import QuestionRetriever
+from src.source_context import SourceContextLoader
 from src.tokenization import CodeAwareTokenizer
 
 
@@ -184,6 +191,90 @@ class CLI:
         ) as error:
             return f"Error: {error}"
 
+    def answer(
+        self,
+        query: str,
+        k: int = 5,
+        index_directory: str = (
+            _DEFAULT_INDEX_DIRECTORY
+        ),
+        model_name: str = MODEL_NAME,
+        max_context_tokens: int = 2500,
+        max_new_tokens: int = 160,
+        device: str | None = None,
+    ) -> str:
+        try:
+            question_retriever = (
+                self._create_question_retriever(
+                    Path(index_directory)
+                )
+            )
+
+            search_result = question_retriever.search(
+                question=UnansweredQuestion(
+                    question=query
+                ),
+                k=k,
+            )
+
+            answer = self._create_answer_service(
+                    model_name=model_name,
+                    max_context_tokens=max_context_tokens,
+                    max_new_tokens=max_new_tokens,
+                    device=device,
+                ).answer(
+                search_result
+            )
+
+            return answer.model_dump_json(indent=2)
+
+        except (
+            OSError,
+            ValueError,
+            RuntimeError,
+        ) as error:
+            return f"Error: {error}"
+
+    def answer_dataset(
+        self,
+        student_search_results_path: str,
+        save_directory: str,
+        model_name: str = MODEL_NAME,
+        max_context_tokens: int = 2500,
+        max_new_tokens: int = 160,
+        device: str | None = None,
+    ) -> str:
+        try:
+            dataset_answerer = DatasetAnswerer(
+                answer_service=self._create_answer_service(
+                    model_name=model_name,
+                    max_context_tokens=max_context_tokens,
+                    max_new_tokens=max_new_tokens,
+                    device=device,
+                ),
+                file_reader=JsonFileReader(),
+                writer=AnswersWriter(),
+            )
+
+            output_path = dataset_answerer.answer_file(
+                student_search_results_path=Path(
+                    student_search_results_path
+                ),
+                save_directory=Path(save_directory),
+            )
+
+            return (
+                "Saved student_search_results_and_answer "
+                f"to {output_path}"
+            )
+
+        except (
+            OSError,
+            ValueError,
+            RuntimeError,
+        ) as error:
+            return f"Error: {error}"
+
     def evaluate(
         self,
         student_search_results_path: str,
@@ -233,6 +324,26 @@ class CLI:
             RuntimeError,
         ) as error:
             return f"Error: {error}"
+
+    @staticmethod
+    def _create_answer_service(
+        model_name: str,
+        max_context_tokens: int,
+        max_new_tokens: int,
+        device: str | None,
+    ) -> AnswerService:
+        return AnswerService(
+            context_loader=SourceContextLoader(
+                file_reader=FileReader(),
+                project_root=Path.cwd(),
+            ),
+            generator=QwenAnswerGenerator(
+                model_name=model_name,
+                max_context_tokens=max_context_tokens,
+                max_new_tokens=max_new_tokens,
+                device=device,
+            ),
+        )
 
     @staticmethod
     def _create_question_retriever(

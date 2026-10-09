@@ -8,7 +8,9 @@ dependencies = [
     "bm25s>=0.3.11",
     "fire>=0.7.1",
     "pydantic>=2.13.5",
+    "torch>=2.14.1",
     "tqdm>=4.70.1",
+    "transformers>=5.19.0",
 ]
 
 [dependency-groups]
@@ -26,3 +28,4 @@ exclude = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
