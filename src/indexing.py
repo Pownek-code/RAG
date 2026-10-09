@@ -12,14 +12,15 @@ from src.tokenization import TextTokenizer
 class BM25Index:
     """Lexical index that ranks chunks with BM25.
 
-    The searchable text of a chunk is its file path followed by its
-    content, so queries can match path words as well as code.
+    The searchable text of a chunk is its file path, its context (such
+    as the Markdown heading path) and its content, so queries can
+    match path and section words as well as the text itself.
     """
 
     INDEX_DIRECTORY_NAME = "index"
     CHUNKS_FILE_NAME = "chunks.jsonl"
     MANIFEST_FILE_NAME = "manifest.json"
-    FORMAT_VERSION = 1
+    FORMAT_VERSION = 2
 
     def __init__(self, tokenizer: TextTokenizer) -> None:
         """Create an empty index.
@@ -181,11 +182,15 @@ class BM25Index:
             )
 
         if manifest["format_version"] != cls.FORMAT_VERSION:
-            raise ValueError("Unsupported index format version")
+            raise ValueError(
+                "Unsupported index format version; "
+                "rebuild it with the index command"
+            )
 
         if manifest["tokenizer"] != tokenizer.name:
             raise ValueError(
-                "The index was created with a different tokenizer"
+                "The index was created with a different tokenizer; "
+                "rebuild it with the index command"
             )
 
         instance = cls(tokenizer=tokenizer)
@@ -205,7 +210,9 @@ class BM25Index:
     @staticmethod
     def _searchable_text(chunk: SourceChunk) -> str:
         """Return the text that is tokenized and indexed for a chunk."""
-        return f"{chunk.file_path}\n{chunk.content}"
+        return (
+            f"{chunk.file_path}\n{chunk.context}\n{chunk.content}"
+        )
 
     def _require_retriever(self) -> bm25s.BM25:
         """Return the BM25 engine or fail if there is none."""

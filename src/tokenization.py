@@ -3,6 +3,8 @@
 import re
 from abc import ABC, abstractmethod
 
+import Stemmer
+
 
 class TextTokenizer(ABC):
     """Turns text into a list of terms."""
@@ -20,12 +22,21 @@ class TextTokenizer(ABC):
 
 
 class CodeAwareTokenizer(TextTokenizer):
-    """Lowercase tokenizer that understands identifiers.
+    """Lowercase, stemming tokenizer that understands identifiers.
 
     An identifier such as ``max_model_len`` yields the full term and
     its words (``max``, ``model``, ``len``), so queries can match
-    either the exact name or its parts.
+    either the exact name or its parts. Every term is stemmed
+    ("supported" and "supports" both become "support"), and common
+    question and filler words are dropped, unless that would leave
+    nothing.
     """
+
+    STOP_WORDS = frozenset(
+        "what which how do does is are the a an of to in for on with "
+        "by from can i you it its be as that this vllm used use when "
+        "where why who whom there their".split()
+    )
 
     TOKEN_PATTERN = re.compile(
         r"[A-Za-z_][A-Za-z0-9_.]*|\d+"
@@ -37,12 +48,32 @@ class CodeAwareTokenizer(TextTokenizer):
         r"\d+"
     )
 
+    def __init__(self) -> None:
+        """Create the stemmer and the stop-word set in stemmed form."""
+        self._stemmer = Stemmer.Stemmer("english")
+        self._stop_terms = self.STOP_WORDS | frozenset(
+            self._stemmer.stemWords(sorted(self.STOP_WORDS))
+        )
+
     @property
     def name(self) -> str:
         """Return the tokenizer version stored in the index."""
-        return "code-aware-v1"
+        return "code-aware-v2"
 
     def tokenize(self, text: str) -> list[str]:
+        """Return stemmed identifiers and their component words.
+
+        Stop words are removed, except when the text consists of
+        nothing else, so a query such as "vllm" still searches.
+        """
+        terms = self._stemmer.stemWords(self._split_identifiers(text))
+        meaningful = [
+            term for term in terms if term not in self._stop_terms
+        ]
+
+        return meaningful or terms
+
+    def _split_identifiers(self, text: str) -> list[str]:
         """Return full identifiers followed by their component words."""
         tokens: list[str] = []
 
@@ -60,4 +91,5 @@ class CodeAwareTokenizer(TextTokenizer):
 
                     if normalized_word != normalized_token:
                         tokens.append(normalized_word)
+
         return tokens

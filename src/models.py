@@ -113,6 +113,10 @@ class SourceChunk(BaseModel):
     The original content is addressed with:
 
         source[first_character_index:last_character_index]
+
+    ``context`` is extra text describing where the chunk sits (for
+    example its Markdown heading path). It is indexed to improve
+    search but is not part of the source text.
     """
 
     file_path: str
@@ -120,6 +124,7 @@ class SourceChunk(BaseModel):
     first_character_index: int = Field(ge=0)
     last_character_index: int = Field(ge=0)
     document_type: DocumentType
+    context: str = ""
 
     @model_validator(mode="after")
     def validate_character_range(self) -> "SourceChunk":

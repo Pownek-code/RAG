@@ -3,6 +3,8 @@
 import ast
 import re
 from abc import ABC, abstractmethod
+from bisect import bisect_right
+from collections.abc import Callable
 
 from src.ingestion.models import LoadedDocument
 from src.models import SourceChunk
@@ -63,6 +65,7 @@ class Chunker(ABC):
             return []
 
         boundaries = self._prepare_boundaries(text)
+        context_at = self._build_context_finder(text)
         chunks: list[SourceChunk] = []
         start = 0
 
@@ -84,6 +87,7 @@ class Chunker(ABC):
                     document=document,
                     start=start,
                     end=end,
+                    context=context_at(start),
                 )
             )
 
@@ -167,6 +171,7 @@ class Chunker(ABC):
         document: LoadedDocument,
         start: int,
         end: int,
+        context: str = "",
     ) -> SourceChunk:
         """Build the chunk covering ``text[start:end]``."""
         return SourceChunk(
@@ -175,7 +180,19 @@ class Chunker(ABC):
             first_character_index=start,
             last_character_index=end,
             document_type=document.document_type,
+            context=context,
         )
+
+    def _build_context_finder(
+        self,
+        text: str,
+    ) -> Callable[[int], str]:
+        """Return a function giving the search context of a chunk start.
+
+        The default is no context. Subclasses override this to describe
+        where in the document a chunk begins.
+        """
+        return lambda start: ""
 
     @abstractmethod
     def _find_section_boundaries(
@@ -259,6 +276,9 @@ class DocumentationChunker(Chunker):
     PARAGRAPH_BREAK_PATTERN = re.compile(
         r"\r?\n[ \t]*\r?\n"
     )
+    HEADING_PARTS_PATTERN = re.compile(
+        r"(?m)^[ \t]{0,3}(#{1,6})[ \t]+(.+?)[ \t]*$"
+    )
 
     def _find_section_boundaries(
         self,
@@ -282,3 +302,42 @@ class DocumentationChunker(Chunker):
             )
 
         return sorted(boundaries)
+
+    def _build_context_finder(
+        self,
+        text: str,
+    ) -> Callable[[int], str]:
+        """Return the heading path in force where a chunk starts.
+
+        For a chunk inside "Quantization" > "Quark" the context is
+        ``"Quantization Quark"``, so a question about Quark can match
+        a chunk that never repeats the section title.
+        """
+        positions: list[int] = []
+        heading_paths: list[str] = []
+        titles_by_level: dict[int, str] = {}
+
+        for heading in self.HEADING_PARTS_PATTERN.finditer(text):
+            level = len(heading.group(1))
+            titles_by_level = {
+                known_level: title
+                for known_level, title in titles_by_level.items()
+                if known_level < level
+            }
+            titles_by_level[level] = heading.group(2).strip()
+
+            positions.append(heading.start())
+            heading_paths.append(
+                " ".join(
+                    titles_by_level[known_level]
+                    for known_level in sorted(titles_by_level)
+                )
+            )
+
+        def context_at(start: int) -> str:
+            """Return the heading path of the last heading before start."""
+            index = bisect_right(positions, start) - 1
+
+            return heading_paths[index] if index >= 0 else ""
+
+        return context_at
