@@ -170,6 +170,16 @@ class BM25Index:
         with manifest_path.open(encoding="utf-8") as file:
             manifest = json.load(file)
 
+        required_keys = {"format_version", "tokenizer", "chunk_count"}
+
+        if (
+            not isinstance(manifest, dict)
+            or not required_keys <= manifest.keys()
+        ):
+            raise ValueError(
+                f"Index manifest is invalid: {manifest_path}"
+            )
+
         if manifest["format_version"] != cls.FORMAT_VERSION:
             raise ValueError("Unsupported index format version")
 

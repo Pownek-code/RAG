@@ -14,6 +14,11 @@ from src.chunking import (
     DocumentationChunker,
     PythonChunker,
 )
+from src.cli_support import (
+    format_error,
+    require_positive_int,
+    require_text,
+)
 from src.dataset import (
     DatasetLoader,
     DatasetSearcher,
@@ -69,6 +74,12 @@ class CLI:
             A completion message, or an ``Error: ...`` message.
         """
         try:
+            max_chunk_size = require_positive_int(
+                "max_chunk_size", max_chunk_size
+            )
+            repository_path = require_text("repository_path", repository_path)
+            index_directory = require_text("index_directory", index_directory)
+
             project_root = Path.cwd()
 
             repository_loader = RepositoryLoader(
@@ -121,7 +132,7 @@ class CLI:
             ValueError,
             RuntimeError,
         ) as error:
-            return f"Error: {error}"
+            return format_error(error)
 
     def search(
         self,
@@ -142,6 +153,10 @@ class CLI:
             ``MinimalSearchResults`` JSON, or an ``Error: ...`` message.
         """
         try:
+            query = require_text("Query", query)
+            k = require_positive_int("k", k)
+            index_directory = require_text("index_directory", index_directory)
+
             question_retriever = (
                 self._create_question_retriever(
                     Path(index_directory)
@@ -166,7 +181,7 @@ class CLI:
             ValueError,
             RuntimeError,
         ) as error:
-            return f"Error: {error}"
+            return format_error(error)
 
     def search_dataset(
         self,
@@ -190,6 +205,11 @@ class CLI:
             A message with the output path, or an ``Error: ...`` message.
         """
         try:
+            dataset_path = require_text("dataset_path", dataset_path)
+            k = require_positive_int("k", k)
+            save_directory = require_text("save_directory", save_directory)
+            index_directory = require_text("index_directory", index_directory)
+
             question_retriever = (
                 self._create_question_retriever(
                     Path(index_directory)
@@ -230,7 +250,7 @@ class CLI:
             ValueError,
             RuntimeError,
         ) as error:
-            return f"Error: {error}"
+            return format_error(error)
 
     def answer(
         self,
@@ -259,6 +279,19 @@ class CLI:
             ``MinimalAnswer`` JSON, or an ``Error: ...`` message.
         """
         try:
+            query = require_text("Query", query)
+            k = require_positive_int("k", k)
+            index_directory = require_text("index_directory", index_directory)
+            model_name = require_text("model_name", model_name)
+            max_context_tokens = require_positive_int(
+                "max_context_tokens", max_context_tokens
+            )
+            max_new_tokens = require_positive_int(
+                "max_new_tokens", max_new_tokens
+            )
+            if device is not None:
+                device = require_text("device", device)
+
             question_retriever = (
                 self._create_question_retriever(
                     Path(index_directory)
@@ -288,7 +321,7 @@ class CLI:
             ValueError,
             RuntimeError,
         ) as error:
-            return f"Error: {error}"
+            return format_error(error)
 
     def answer_dataset(
         self,
@@ -314,6 +347,20 @@ class CLI:
             A message with the output path, or an ``Error: ...`` message.
         """
         try:
+            student_search_results_path = require_text(
+                "student_search_results_path", student_search_results_path
+            )
+            save_directory = require_text("save_directory", save_directory)
+            model_name = require_text("model_name", model_name)
+            max_context_tokens = require_positive_int(
+                "max_context_tokens", max_context_tokens
+            )
+            max_new_tokens = require_positive_int(
+                "max_new_tokens", max_new_tokens
+            )
+            if device is not None:
+                device = require_text("device", device)
+
             dataset_answerer = DatasetAnswerer(
                 answer_service=self._create_answer_service(
                     model_name=model_name,
@@ -342,7 +389,7 @@ class CLI:
             ValueError,
             RuntimeError,
         ) as error:
-            return f"Error: {error}"
+            return format_error(error)
 
     def evaluate(
         self,
@@ -359,6 +406,11 @@ class CLI:
             The recall value, or an ``Error: ...`` message.
         """
         try:
+            student_search_results_path = require_text(
+                "student_search_results_path", student_search_results_path
+            )
+            dataset_path = require_text("dataset_path", dataset_path)
+
             json_file_reader = JsonFileReader()
 
             dataset_loader = DatasetLoader(
@@ -401,7 +453,7 @@ class CLI:
             ValueError,
             RuntimeError,
         ) as error:
-            return f"Error: {error}"
+            return format_error(error)
 
     @staticmethod
     def _create_answer_service(
