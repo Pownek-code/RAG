@@ -1094,6 +1094,50 @@ wheels = [
 ]
 
 [[package]]
+name = "pystemmer"
+version = "3.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/78/95/bb893462b08db211b248f6b1aaa0dc07d068dc86f180178bc9072fef86bb/pystemmer-3.1.0.tar.gz", hash = "sha256:083cc3ed90f4c3b0668f8e31c2925cbb4db3bf0fd6d710e0ad0914f33685f7df", size = 302551, upload-time = "2026-05-22T11:23:44.581Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e0/10/1a95c61e7898e1bdb2964bb361074f7aa9417fd0c4a141dea7c2a210ce18/pystemmer-3.1.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:dced40f3aa6326b6ff8f2c5eb87d8a5a3229b32f2e0e4f7de54212bc2d33cead", size = 241535, upload-time = "2026-05-22T11:13:37.992Z" },
+    { url = "https://files.pythonhosted.org/packages/e1/45/a074489a02121658105480771ce4b01bdcc865369fda3a55e7ac0f1aea54/pystemmer-3.1.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:c1b1cb9f84ca419e24446e0e8d32218027ba574048b4ad0ae233d1b94ff52c63", size = 247743, upload-time = "2026-05-22T11:13:39.762Z" },
+    { url = "https://files.pythonhosted.org/packages/47/e6/d6f90ce7f89dca7466c4238e9303748e7685a4b028f4ebfa339bbe51da02/pystemmer-3.1.0-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:c6d3d499270ffb8822a7dfb0ed6dfed8c4971a9c581206b898f6e0e7bccd7113", size = 733901, upload-time = "2026-05-22T11:13:41.68Z" },
+    { url = "https://files.pythonhosted.org/packages/bc/88/dabb47c125987233d7922e4bca0ef24cec84a983a45cfec2ff75ac597689/pystemmer-3.1.0-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:033fbad2c93fbaacc9e3f2a64c8edd9c6797c7bbf024a06ed4666b497bb30f68", size = 741980, upload-time = "2026-05-22T11:13:44.961Z" },
+    { url = "https://files.pythonhosted.org/packages/0e/53/dd9ddf1d09ff5e7fe6990eeffc72399e6935864e9548a7ae768784084196/pystemmer-3.1.0-cp310-cp310-musllinux_1_2_aarch64.whl", hash = "sha256:87d5c1acafed64075116d48fda1ad28171071255c1df2c59ce46e2ce7aba61f7", size = 739813, upload-time = "2026-05-22T11:13:46.687Z" },
+    { url = "https://files.pythonhosted.org/packages/56/32/0fc7263f38b5ea30ad832a8f39dc7514a0356090537cbe977153317171b6/pystemmer-3.1.0-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:3f613eb1fd3cfb502012e81dc44731f88ec0de089febbdaf8490bc97283a65bd", size = 736336, upload-time = "2026-05-22T11:13:48.061Z" },
+    { url = "https://files.pythonhosted.org/packages/3d/d6/e71a12764e22261b57b108055e1ce574c57f801ab312e2fbc26c0191121e/pystemmer-3.1.0-cp310-cp310-win32.whl", hash = "sha256:1c8ef2419862bd518b99bd64008f7f1d538150e11ddb2826d54ab5bc727d93fc", size = 157083, upload-time = "2026-05-22T11:13:50.291Z" },
+    { url = "https://files.pythonhosted.org/packages/17/68/17f7b310a3b5228c3198bf3ce46f6709306b5d0d3593c9af7aa974ace495/pystemmer-3.1.0-cp310-cp310-win_amd64.whl", hash = "sha256:bb8208367b476f3d5d8250d1dfd7296256a270b0bf3ab770710ddcbb6f22d496", size = 224551, upload-time = "2026-05-22T11:13:51.756Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/ae/ad754bb194c2b430235082e87faa2aa3972c80126a4f9930263bb433ceda/pystemmer-3.1.0-cp310-cp310-win_arm64.whl", hash = "sha256:378361efc77b3e59b0c8b49efc2b1ba71ab85654529e2e4562faaec40ee62396", size = 226461, upload-time = "2026-05-22T11:13:53.452Z" },
+    { url = "https://files.pythonhosted.org/packages/b1/5d/68d5c7f37304dabcbc5702e41b2dccd7d36c96d07d9376366555c9f3f5c6/pystemmer-3.1.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:26e401723d0aa078ec0bb8e459d6976fe30108182cb3b08056768544754f298d", size = 241563, upload-time = "2026-05-22T11:13:54.786Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/2c/4e784ee4ec409cf7643d5b22de88fe2e0d8adb4ad41db3164bfaf5e5ba5c/pystemmer-3.1.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:489618980daa0e876bd85ef74487889a0c680a2b6eef843d83c5ab30c3346e63", size = 247495, upload-time = "2026-05-22T11:13:57.3Z" },
+    { url = "https://files.pythonhosted.org/packages/6d/c8/0dae888a93513d694ed66c15300663ce64e024ea038dacbf8cdebad4c7d9/pystemmer-3.1.0-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:ca5cd8c0f9a76af64f66ac6073b20ccc0ee8c2e7ed5d9f761053449a6f4c1f26", size = 744313, upload-time = "2026-05-22T11:13:58.94Z" },
+    { url = "https://files.pythonhosted.org/packages/71/56/d8bd8bb87b2158336e9b3520a5f74af8c3f5e7d5fbc921940b1d3fd2f773/pystemmer-3.1.0-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:eb2f9a6df9437d2bee969f6d637d18297c77977f22113bd12e1d42230b90972f", size = 753559, upload-time = "2026-05-22T11:14:00.383Z" },
+    { url = "https://files.pythonhosted.org/packages/35/a1/b737131b99f278f2358c4356c5edc12a237ff3a92ee3f3f02b530a29c17c/pystemmer-3.1.0-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:e220773ba709e9f6a55318ef94b83837b85cb7a50e9ae7952bf576d719823a09", size = 751537, upload-time = "2026-05-22T11:14:01.857Z" },
+    { url = "https://files.pythonhosted.org/packages/29/57/4fbc6e634c3b60e43ce0f288d0f409fa7f24c06c456622bcd860783545a7/pystemmer-3.1.0-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:3899e41bb6339ada67fe8501601daf53c59cce34cd126197280c7a5d5c5fd311", size = 746565, upload-time = "2026-05-22T11:14:03.589Z" },
+    { url = "https://files.pythonhosted.org/packages/20/b3/0bc2a9016bf2b48a606c4d20c105fbfc5dbd2b25720cfcf0661aa5348021/pystemmer-3.1.0-cp311-cp311-win32.whl", hash = "sha256:38b050bd6c919ddee772659dd2475deb8ee61b1396db7de5d984e67ee99f3008", size = 156855, upload-time = "2026-05-22T11:14:04.927Z" },
+    { url = "https://files.pythonhosted.org/packages/fe/ef/c289f3ce392b376062d709f2fd0563d260e6a2522e516837ee584b974a75/pystemmer-3.1.0-cp311-cp311-win_amd64.whl", hash = "sha256:44dcb446f6955e0447e097004b3b66e4cf14a7d567b5e3a0ec128c875fea71c9", size = 224712, upload-time = "2026-05-22T11:14:06.464Z" },
+    { url = "https://files.pythonhosted.org/packages/64/c7/2919c633b9f3f7ebd28fef14b125c98368efe20bc397bff14e46ef454c26/pystemmer-3.1.0-cp311-cp311-win_arm64.whl", hash = "sha256:5eae62ddb791fa4abc33979583423d9771cfa80c80f3c51c67698d6b55e36167", size = 226461, upload-time = "2026-05-22T11:14:07.76Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/0a/4a6a42cf93c26a8449573249f2ddbaf027b8d84beb3cb6da536f0b4a033f/pystemmer-3.1.0-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:a85fd3afc08a0aba9142d92c85df87a127faab787619941bb1c433dadfbbbb53", size = 242185, upload-time = "2026-05-22T11:14:08.951Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/5a/cace8a3b00dfeb8497d240ed4ca34d38d22c47bb90de302bcb8e5fb6bd35/pystemmer-3.1.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:b40b669f121949bbbd97fe77a2606d46b14df9fcadabc9539982398772592ac4", size = 247353, upload-time = "2026-05-22T11:14:10.609Z" },
+    { url = "https://files.pythonhosted.org/packages/06/55/78699a2621a472be98bae7fb36bdda610b7d1c8bcd8ff448301230260cf9/pystemmer-3.1.0-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:550bd609aa8dc324033eb1c8d34bfd68649183bbdab871ff534332dcafdc5e5a", size = 752410, upload-time = "2026-05-22T11:14:12.075Z" },
+    { url = "https://files.pythonhosted.org/packages/67/63/e3937ac1df5243e94bde11fc1e57584480de419587f46a4badf5088e7ca6/pystemmer-3.1.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:7c6db50dd5e92a2a0acf2b2cec55fddcff3928bf490e26d0c45bc0483272a46c", size = 761062, upload-time = "2026-05-22T11:14:13.78Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/63/1f7ef438e19029025fc73fe95480d0dbb2ff323f1aec9c087ad9eb952afb/pystemmer-3.1.0-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:b86b0b14634788060cab98ad0cae023620aa7b29f9155e8b474632fc80793405", size = 756304, upload-time = "2026-05-22T11:14:15.419Z" },
+    { url = "https://files.pythonhosted.org/packages/ad/5e/816d59b780aa552c87a7e25148005f41be18193482b122d67c6235741b31/pystemmer-3.1.0-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:6a1289aa31f5f613a31916e7d4e6eaf6b0e6e70a3d494bf08b1d999a0aaf458e", size = 754520, upload-time = "2026-05-22T11:14:16.754Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/bc/58abda8bf0f87c18804a2ebfe05091417d121b3dde08a57e87aab8509fa4/pystemmer-3.1.0-cp312-cp312-win32.whl", hash = "sha256:2bab76be269302075cb892be2b884ae3c2ae22dd3d8fbcf20e01d969243719d0", size = 157476, upload-time = "2026-05-22T11:14:18.024Z" },
+    { url = "https://files.pythonhosted.org/packages/e0/b9/785aff6e2ca5947bc7139ec320df0510f02ae2bbb625d534245a8fcda549/pystemmer-3.1.0-cp312-cp312-win_amd64.whl", hash = "sha256:805ac25b73d54200026ef4733a516d3b5a7598644454d5eb161f4ba73e43c9be", size = 225133, upload-time = "2026-05-22T11:14:19.219Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/81/0c5cabf4a6f92c1c42d248366b6d967be1da6ee75a993e2a1834620c5226/pystemmer-3.1.0-cp312-cp312-win_arm64.whl", hash = "sha256:ab2dfe428ef626eec34e5360d20a04c41cc14fd70a96e9866902d19dc27cc5b9", size = 226532, upload-time = "2026-05-22T11:14:20.818Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/07/d3c7d6ea2e47fec881e54a588a5f126d525f517b0c3df8f811e8c2af8f45/pystemmer-3.1.0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:6b9bbe98fb698f2d19f6d58a0f6f6858bea93457e5c3aca0c5fd889658fba61a", size = 241824, upload-time = "2026-05-22T11:14:22.003Z" },
+    { url = "https://files.pythonhosted.org/packages/7c/bc/55a89144ea63c6247fa87aafc0124bb043a95f428a1862fd37248c318eb0/pystemmer-3.1.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:ec88f8a24d6fd49a0301efe4e4f0277063158f46f9cc227f2cd49afec78bb169", size = 247100, upload-time = "2026-05-22T11:14:23.743Z" },
+    { url = "https://files.pythonhosted.org/packages/78/b0/907b842baea0a5667ae06630afea3727949a3f25b7615b1dd8adf8e849bb/pystemmer-3.1.0-cp313-cp313-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:ec37dead495a6da4349c66f5984ef4148059f97bb44c95077f1aa5e50059ebc7", size = 747692, upload-time = "2026-05-22T11:14:25.057Z" },
+    { url = "https://files.pythonhosted.org/packages/b0/30/08cec4c31ec281e690027a9c4dfa5da914915c959069560b5d2d3622c5b8/pystemmer-3.1.0-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:58c5bb84ebbd380226d90cc0df81cc84e325ed0f30f8f2439f84da50e681b316", size = 755850, upload-time = "2026-05-22T11:14:26.789Z" },
+    { url = "https://files.pythonhosted.org/packages/49/07/9fb7825dbba2280ba59bac5cced2d05cd09047c8354b03c4e55589c6c8c6/pystemmer-3.1.0-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:9cc7fefd98903b8fd42f3c650f7d8c229172e435d5e122d1821f1a744b13c428", size = 752512, upload-time = "2026-05-22T11:14:28.282Z" },
+    { url = "https://files.pythonhosted.org/packages/74/da/06c449c1332e0afae4af59e9749ce2b1a079ef96724240b745c17276b090/pystemmer-3.1.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:e17dab9e6a44066c3a57e8133353f984026c0cc73340e136a60f946200db9881", size = 749671, upload-time = "2026-05-22T11:14:30.948Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/bb/c47f3b748080733ac3e7636eb27f9161ac1897ea0c2c0a1e1951ce01dc68/pystemmer-3.1.0-cp313-cp313-win32.whl", hash = "sha256:2a3a2ee3429b877a2ce3e7c8e82c5e7f76416281b9b839bd8de44bfbe2b14881", size = 157354, upload-time = "2026-05-22T11:14:32.26Z" },
+    { url = "https://files.pythonhosted.org/packages/bf/9e/99c8071e5c7c23fd855e11941d780792262f76f19864f761b40f73b12f61/pystemmer-3.1.0-cp313-cp313-win_amd64.whl", hash = "sha256:8527e1718b80a628303378d439057c90ef242dfc99efcad60ba2e8fb14ded8c6", size = 225078, upload-time = "2026-05-22T11:14:33.423Z" },
+    { url = "https://files.pythonhosted.org/packages/e0/2b/fc2c23f4961f530ba646e9c7913e491c610936bfc40689d53103ad6b16c4/pystemmer-3.1.0-cp313-cp313-win_arm64.whl", hash = "sha256:b94cec510cc2da557e048cbe300532c4435dca9093cb49839c8cbb78709eaba0", size = 226424, upload-time = "2026-05-22T11:14:35.006Z" },
+]
+
+[[package]]
 name = "pytest"
 version = "9.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1165,6 +1209,7 @@ dependencies = [
     { name = "bm25s" },
     { name = "fire" },
     { name = "pydantic" },
+    { name = "pystemmer" },
     { name = "torch" },
     { name = "tqdm" },
     { name = "transformers" },
@@ -1182,6 +1227,7 @@ requires-dist = [
     { name = "bm25s", specifier = ">=0.3.11" },
     { name = "fire", specifier = ">=0.7.1" },
     { name = "pydantic", specifier = ">=2.13.5" },
+    { name = "pystemmer", specifier = ">=3.1.0" },
     { name = "torch", specifier = ">=2.14.1" },
     { name = "tqdm", specifier = ">=4.70.1" },
     { name = "transformers", specifier = ">=5.19.0" },
