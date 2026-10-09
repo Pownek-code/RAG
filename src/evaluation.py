@@ -1,3 +1,5 @@
+"""Retrieval quality measured with recall@k."""
+
 from src.models import (
     AnsweredDataset,
     AnsweredQuestion,
@@ -8,6 +10,12 @@ from src.models import (
 
 
 class RetrievalEvaluator:
+    """Computes recall@k the way the subject defines it.
+
+    A reference source counts as found when a retrieved source is in the
+    same file and overlaps it with an IoU of at least ``MINIMUM_IOU``.
+    """
+
     MINIMUM_IOU = 0.05
 
     def evaluate(
@@ -15,6 +23,17 @@ class RetrievalEvaluator:
         dataset: AnsweredDataset,
         student_results: StudentSearchResults,
     ) -> float:
+        """Average recall over all questions of a dataset.
+
+        Questions without search results count as a recall of zero.
+
+        Args:
+            dataset: Questions with their reference sources.
+            student_results: Retrieved sources; only the first ``k`` count.
+
+        Returns:
+            The mean recall between 0 and 1.
+        """
         results_by_question_id = {
             result.question_id: result
             for result in student_results.search_results
@@ -47,6 +66,7 @@ class RetrievalEvaluator:
         search_result: MinimalSearchResults | None,
         k: int,
     ) -> float:
+        """Return the share of reference sources found in the top k."""
         if search_result is None:
             return 0.0
 
@@ -73,6 +93,7 @@ class RetrievalEvaluator:
         expected_source: MinimalSource,
         retrieved_source: MinimalSource,
     ) -> bool:
+        """Tell whether two sources are in the same file and overlap enough."""
         if (
             expected_source.file_path
             != retrieved_source.file_path
@@ -91,6 +112,16 @@ class RetrievalEvaluator:
         expected_source: MinimalSource,
         retrieved_source: MinimalSource,
     ) -> float:
+        """Intersection over union of two character ranges.
+
+        Args:
+            expected_source: The reference source.
+            retrieved_source: The retrieved source.
+
+        Returns:
+            A value between 0 and 1; 0 when the ranges do not overlap.
+            The file paths are not compared here.
+        """
         expected_length = (
             expected_source.last_character_index
             - expected_source.first_character_index

@@ -1,3 +1,5 @@
+"""Orchestration of answer generation for search results."""
+
 import logging
 from pathlib import Path
 
@@ -26,6 +28,12 @@ class AnswerService:
         context_loader: SourceContextLoader,
         generator: AnswerGenerator,
     ) -> None:
+        """Store the collaborators used to answer questions.
+
+        Args:
+            context_loader: Reads the text of retrieved sources.
+            generator: Produces the answer from the question and excerpts.
+        """
         self._context_loader = context_loader
         self._generator = generator
 
@@ -57,6 +65,7 @@ class AnswerService:
         self,
         search_result: MinimalSearchResults,
     ) -> list[SourceExcerpt]:
+        """Load every readable source, skipping the ones that fail."""
         excerpts: list[SourceExcerpt] = []
 
         for source in search_result.retrieved_sources:
@@ -99,6 +108,15 @@ class AnswersWriter:
         results: StudentSearchResultsAndAnswer,
         output_path: Path,
     ) -> Path:
+        """Write answered results as JSON, creating parent directories.
+
+        Args:
+            results: The answers to write.
+            output_path: Destination file.
+
+        Returns:
+            The path that was written.
+        """
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(
             results.model_dump_json(indent=2),
@@ -117,6 +135,13 @@ class DatasetAnswerer:
         file_reader: JsonFileReader,
         writer: AnswersWriter,
     ) -> None:
+        """Store the collaborators used to answer a results file.
+
+        Args:
+            answer_service: Generates the answers.
+            file_reader: Reads the search results JSON file.
+            writer: Writes the answered results.
+        """
         self._answer_service = answer_service
         self._file_reader = file_reader
         self._writer = writer

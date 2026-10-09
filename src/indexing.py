@@ -1,3 +1,5 @@
+"""Persistent BM25 index over source chunks."""
+
 import json
 from pathlib import Path
 
@@ -8,17 +10,33 @@ from src.tokenization import TextTokenizer
 
 
 class BM25Index:
+    """Lexical index that ranks chunks with BM25.
+
+    The searchable text of a chunk is its file path followed by its
+    content, so queries can match path words as well as code.
+    """
+
     INDEX_DIRECTORY_NAME = "index"
     CHUNKS_FILE_NAME = "chunks.jsonl"
     MANIFEST_FILE_NAME = "manifest.json"
     FORMAT_VERSION = 1
 
     def __init__(self, tokenizer: TextTokenizer) -> None:
+        """Create an empty index.
+
+        Args:
+            tokenizer: Turns text into the terms that are indexed.
+        """
         self.tokenizer = tokenizer
         self._retriever: bm25s.BM25 | None = None
         self._chunks: list[SourceChunk] = []
 
     def build(self, chunks: list[SourceChunk]) -> None:
+        """Index the chunks, ordered by file and character range.
+
+        Raises:
+            ValueError: If there are no chunks.
+        """
         if not chunks:
             raise ValueError(
                 "Cannot build an index without source chunks"
@@ -51,6 +69,19 @@ class BM25Index:
         query: str,
         top_k: int = 5,
     ) -> list[RankedChunk]:
+        """Return the best chunks for a query, best first.
+
+        Args:
+            query: The text to search for.
+            top_k: Maximum number of chunks to return.
+
+        Returns:
+            Ranked chunks; empty if the query has no indexable terms.
+
+        Raises:
+            ValueError: If the query is blank or ``top_k`` is not positive.
+            RuntimeError: If the index was neither built nor loaded.
+        """
         retriever = self._require_retriever()
 
         if not query.strip():
@@ -89,6 +120,7 @@ class BM25Index:
         ]
 
     def save(self, directory: Path) -> None:
+        """Write the index, chunks and manifest into a directory."""
         retriever = self._require_retriever()
 
         directory.mkdir(parents=True, exist_ok=True)
@@ -110,6 +142,17 @@ class BM25Index:
         directory: Path,
         tokenizer: TextTokenizer,
     ) -> "BM25Index":
+        """Load a saved index.
+
+        Args:
+            directory: Directory written by ``save``.
+            tokenizer: Must be the tokenizer the index was built with.
+
+        Raises:
+            FileNotFoundError: If the manifest or chunks are missing.
+            ValueError: If the format or tokenizer does not match, or the
+                manifest and chunk file disagree.
+        """
         manifest_path = directory / cls.MANIFEST_FILE_NAME
         chunks_path = directory / cls.CHUNKS_FILE_NAME
         index_path = directory / cls.INDEX_DIRECTORY_NAME
@@ -151,9 +194,11 @@ class BM25Index:
 
     @staticmethod
     def _searchable_text(chunk: SourceChunk) -> str:
+        """Return the text that is tokenized and indexed for a chunk."""
         return f"{chunk.file_path}\n{chunk.content}"
 
     def _require_retriever(self) -> bm25s.BM25:
+        """Return the BM25 engine or fail if there is none."""
         if self._retriever is None:
             raise RuntimeError(
                 "The BM25 index has not been built or loaded"
@@ -162,6 +207,7 @@ class BM25Index:
         return self._retriever
 
     def _save_chunks(self, file_path: Path) -> None:
+        """Write one chunk per line as JSON."""
         with file_path.open(
             mode="w",
             encoding="utf-8",
@@ -174,6 +220,7 @@ class BM25Index:
     def _load_chunks(
         file_path: Path,
     ) -> list[SourceChunk]:
+        """Read the chunks written by ``_save_chunks``."""
         chunks: list[SourceChunk] = []
 
         with file_path.open(encoding="utf-8") as file:
@@ -186,6 +233,7 @@ class BM25Index:
         return chunks
 
     def _save_manifest(self, file_path: Path) -> None:
+        """Write the format version, tokenizer name and chunk count."""
         manifest = {
             "format_version": self.FORMAT_VERSION,
             "tokenizer": self.tokenizer.name,

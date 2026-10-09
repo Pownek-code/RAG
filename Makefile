@@ -7,7 +7,7 @@ run:
 	uv run python -m src --help
 
 debug:
-	uv run python -X dev -m src --help
+	uv run python -m pdb -m src --help
 
 clean:
 	find src tests -type d -name "__pycache__" -prune -exec rm -rf {} +

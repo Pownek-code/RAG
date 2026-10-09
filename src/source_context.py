@@ -1,3 +1,5 @@
+"""Reading the text behind retrieved source locations."""
+
 from pathlib import Path
 
 from src.ingestion.loader import FileReader
@@ -12,6 +14,11 @@ class SourceContextLoader:
         file_reader: FileReader,
         project_root: Path,
     ) -> None:
+        """Store the reader and the resolved project root.
+
+        Raises:
+            NotADirectoryError: If the project root is not a directory.
+        """
         resolved_root = project_root.resolve()
 
         if not resolved_root.is_dir():
@@ -61,6 +68,7 @@ class SourceContextLoader:
         )
 
     def _resolve(self, relative_path: str) -> Path:
+        """Resolve a relative path, rejecting paths outside the root."""
         file_path = (
             self._project_root / relative_path
         ).resolve()

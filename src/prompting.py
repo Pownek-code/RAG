@@ -1,3 +1,5 @@
+"""Prompt construction for grounded answers."""
+
 from collections.abc import Callable
 
 from src.models import SourceExcerpt
@@ -24,6 +26,15 @@ class PromptBuilder:
         count_tokens: Callable[[str], int],
         max_context_tokens: int = 2500,
     ) -> None:
+        """Configure the prompt builder.
+
+        Args:
+            count_tokens: Returns the token length of a text.
+            max_context_tokens: Token budget for all excerpts together.
+
+        Raises:
+            ValueError: If the budget is not positive.
+        """
         if max_context_tokens <= 0:
             raise ValueError(
                 "max_context_tokens must be greater than zero"
@@ -72,6 +83,10 @@ class PromptBuilder:
         )
 
     def _fit(self, text: str, budget: int) -> str:
+        """Return the longest prefix of ``text`` that fits the budget.
+
+        A truncation marker is appended when text had to be cut.
+        """
         if self._count_tokens(text) <= budget:
             return text
 
@@ -90,6 +105,7 @@ class PromptBuilder:
 
     @staticmethod
     def _describe(excerpt: SourceExcerpt) -> str:
+        """Return the file path and character range of an excerpt."""
         source = excerpt.source
 
         return (

@@ -1,3 +1,5 @@
+"""Answer generation with a local language model."""
+
 import re
 from abc import ABC, abstractmethod
 from typing import Any
@@ -37,6 +39,14 @@ class QwenAnswerGenerator(AnswerGenerator):
         max_new_tokens: int = 160,
         device: str | None = None,
     ) -> None:
+        """Configure the generator without loading the model.
+
+        Args:
+            model_name: Hugging Face name of the chat model.
+            max_context_tokens: Token budget for the retrieved context.
+            max_new_tokens: Maximum number of generated tokens.
+            device: ``cuda``, ``mps`` or ``cpu``; detected when ``None``.
+        """
         self._model_name = model_name
         self._device = device
         self._max_context_tokens = max_context_tokens
@@ -49,6 +59,14 @@ class QwenAnswerGenerator(AnswerGenerator):
         question: str,
         excerpts: list[SourceExcerpt],
     ) -> str:
+        """Answer the question using only the excerpts.
+
+        Without excerpts the model is not called and a fixed "no answer"
+        reply is returned.
+
+        Raises:
+            RuntimeError: If the model cannot be loaded or generation fails.
+        """
         if not excerpts:
             return NO_CONTEXT_ANSWER
 
@@ -105,6 +123,11 @@ class QwenAnswerGenerator(AnswerGenerator):
         return self._clean(text)
 
     def _load(self) -> tuple[Any, Any]:
+        """Load the tokenizer and model on first use, then reuse them.
+
+        The weights are loaded as float32 because the half-precision
+        default is very slow on CPU.
+        """
         if self._model is None:
             try:
                 import torch
@@ -133,6 +156,7 @@ class QwenAnswerGenerator(AnswerGenerator):
         return self._tokenizer, self._model
 
     def _resolve_device(self, torch: Any) -> str:
+        """Return the requested device, else the best available one."""
         if self._device is not None:
             return self._device
 
@@ -146,6 +170,7 @@ class QwenAnswerGenerator(AnswerGenerator):
 
     @staticmethod
     def _clean(text: str) -> str:
+        """Remove any thinking block; fall back to the "no answer" reply."""
         cleaned = _THINK_BLOCK.sub("", text)
         cleaned = cleaned.split("</think>")[-1].strip()
 
