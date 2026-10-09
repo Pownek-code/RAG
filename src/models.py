@@ -121,14 +121,17 @@ class SourceChunk(BaseModel):
 
         return self
 
+
 class RankedChunk(BaseModel):
     chunk: SourceChunk
     score: float
+
 
 class AnsweredDataset(BaseModel):
     rag_questions: list[AnsweredQuestion] = Field(
         min_length=1
     )
+
     @model_validator(mode="after")
     def validate_unique_questions_id(self) -> "AnsweredDataset":
         question_ids = [
@@ -138,6 +141,28 @@ class AnsweredDataset(BaseModel):
         if len(question_ids) != len(set(question_ids)):
             raise ValueError(
                 "Dataset contains duplicate question IDs"
+            )
+
+        return self
+
+
+class SourceExcerpt(BaseModel):
+    """A retrieved source together with its original text."""
+
+    source: MinimalSource
+    content: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_content_length(self) -> "SourceExcerpt":
+        expected_length = (
+            self.source.last_character_index
+            - self.source.first_character_index
+        )
+
+        if len(self.content) != expected_length:
+            raise ValueError(
+                "Excerpt content length must match "
+                "the source character range"
             )
 
         return self
