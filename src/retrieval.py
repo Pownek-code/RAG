@@ -1,5 +1,6 @@
 """Retrieval of source locations for a question."""
 
+from src.config import MAX_CHUNK_SIZE
 from src.indexing import BM25Index
 from src.models import (
     MinimalSearchResults,
@@ -53,7 +54,7 @@ class QuestionRetriever:
         """Convert a ranked chunk into a source location.
 
         Raises:
-            ValueError: If the chunk exceeds the 2000 character limit.
+            ValueError: If the chunk exceeds ``MAX_CHUNK_SIZE`` characters.
         """
         chunk = ranked_chunk.chunk
 
@@ -62,9 +63,10 @@ class QuestionRetriever:
             - chunk.first_character_index
         )
 
-        if source_length > 2000:
+        if source_length > MAX_CHUNK_SIZE:
             raise ValueError(
-                "Retrieved source cannot exceed 2000 characters"
+                "Retrieved source cannot exceed "
+                f"{MAX_CHUNK_SIZE} characters"
             )
 
         return MinimalSource(

@@ -1,9 +1,11 @@
 """Pydantic models exchanged between the pipeline stages."""
 
-from pydantic import BaseModel, Field, model_validator
 import uuid
 from typing import List
-from src.ingestion.file_types import DocumentType
+
+from pydantic import BaseModel, Field, model_validator
+
+from src.ingestion.models import DocumentType
 
 
 class MinimalSource(BaseModel):

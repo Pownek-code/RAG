@@ -5,7 +5,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from src.dataset import JsonFileReader
+from src.dataset import JsonFileReader, resolve_output_path
 from src.generation import AnswerGenerator
 from src.models import (
     MinimalAnswer,
@@ -151,14 +151,20 @@ class DatasetAnswerer:
         student_search_results_path: Path,
         save_directory: Path,
     ) -> Path:
-        """Answer a search results file into ``save_directory``."""
+        """Answer a search results file into ``save_directory``.
+
+        Raises:
+            ValueError: If ``save_directory`` would overwrite the input.
+        """
+        output_path = resolve_output_path(
+            student_search_results_path, save_directory
+        )
+
         results = StudentSearchResults.model_validate_json(
             self._file_reader.read(student_search_results_path)
         )
 
         return self._writer.save(
             results=self._answer_service.answer_all(results),
-            output_path=(
-                save_directory / student_search_results_path.name
-            ),
+            output_path=output_path,
         )

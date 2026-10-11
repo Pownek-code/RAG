@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 
+from src.config import DEFAULT_MAX_CONTEXT_TOKENS
 from src.models import SourceExcerpt
 
 
@@ -24,7 +25,7 @@ class PromptBuilder:
     def __init__(
         self,
         count_tokens: Callable[[str], int],
-        max_context_tokens: int = 2500,
+        max_context_tokens: int = DEFAULT_MAX_CONTEXT_TOKENS,
     ) -> None:
         """Configure the prompt builder.
 

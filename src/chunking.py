@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from bisect import bisect_right
 from collections.abc import Callable
 
+from src.config import MAX_CHUNK_SIZE
 from src.ingestion.models import LoadedDocument
 from src.models import SourceChunk
 
@@ -18,7 +19,7 @@ class Chunker(ABC):
     class applies the size limit and falls back to line breaks.
     """
 
-    MAXIMUM_CHUNK_SIZE = 2000
+    MAXIMUM_CHUNK_SIZE = MAX_CHUNK_SIZE
 
     def __init__(
         self,
@@ -30,7 +31,7 @@ class Chunker(ABC):
             max_chunk_size: Maximum chunk length in characters.
 
         Raises:
-            ValueError: If the size is not between 1 and 2000.
+            ValueError: If the size is not between 1 and ``MAX_CHUNK_SIZE``.
         """
         if max_chunk_size <= 0:
             raise ValueError(
@@ -39,7 +40,8 @@ class Chunker(ABC):
 
         if max_chunk_size > self.MAXIMUM_CHUNK_SIZE:
             raise ValueError(
-                "max_chunk_size cannot be greater than 2000"
+                "max_chunk_size cannot be greater than "
+                f"{self.MAXIMUM_CHUNK_SIZE}"
             )
 
         self.max_chunk_size = max_chunk_size
