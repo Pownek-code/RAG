@@ -4,6 +4,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
+from src.config import PROGRESS_BAR_STYLE
 from src.models import (
     AnsweredDataset,
     MinimalSearchResults,
@@ -197,6 +198,7 @@ class DatasetSearcher:
             dataset.rag_questions,
             desc="Searching questions",
             unit="question",
+            **PROGRESS_BAR_STYLE,
         ):
             result = (
                 self._question_retriever.search(

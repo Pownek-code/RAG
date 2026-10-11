@@ -5,6 +5,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
+from src.config import PROGRESS_BAR_STYLE
 from src.dataset import JsonFileReader, resolve_output_path
 from src.generation import AnswerGenerator
 from src.models import (
@@ -91,6 +92,7 @@ class AnswerService:
                 results.search_results,
                 desc="Answering questions",
                 unit="question",
+                **PROGRESS_BAR_STYLE,
             )
         ]
 
