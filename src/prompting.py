@@ -6,14 +6,18 @@ from src.config import DEFAULT_MAX_CONTEXT_TOKENS
 from src.models import SourceExcerpt
 
 
+# The refusal rule is deliberately a condition, not a ready-made sentence:
+# a small model repeats a quoted sentence even when the answer is in the
+# excerpts (3 of 15 questions were refused that way).
 SYSTEM_PROMPT = (
-    "You answer questions about the vLLM codebase. "
-    "Use only the numbered context excerpts provided by the user. "
-    "If the excerpts do not contain the answer, reply exactly: "
-    "\"The provided context does not contain the answer.\" "
-    "Do not invent file names, functions, options or values. "
+    "You answer questions about the vLLM codebase using the numbered "
+    "context excerpts provided by the user. "
+    "Base your answer on the excerpts and do not invent file names, "
+    "functions, options or values. "
     "Answer concisely, and cite the excerpts you rely on "
-    "with their numbers, for example [1]."
+    "with their numbers, for example [1]. "
+    "Only if the excerpts contain nothing relevant to the question, "
+    "say that the context does not cover it."
 )
 
 _TRUNCATION_MARKER = "\n[... truncated ...]"
