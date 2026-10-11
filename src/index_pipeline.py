@@ -5,6 +5,7 @@ from pathlib import Path
 from tqdm import tqdm
 
 from src.chunking import Chunker
+from src.config import PROGRESS_BAR_STYLE
 from src.indexing import BM25Index
 from src.ingestion.loader import RepositoryLoader
 from src.ingestion.models import DocumentType
@@ -61,6 +62,7 @@ class IndexingPipeline:
             documents,
             desc="Chunking documents",
             unit="document",
+            **PROGRESS_BAR_STYLE,
         ):
             chunker = self._chunkers.get(
                 document.document_type

@@ -4,7 +4,9 @@ import json
 from pathlib import Path
 
 import bm25s
+from tqdm import tqdm
 
+from src.config import PROGRESS_BAR_STYLE
 from src.models import RankedChunk, SourceChunk
 from src.tokenization import TextTokenizer
 
@@ -56,7 +58,12 @@ class BM25Index:
             self.tokenizer.tokenize(
                 self._searchable_text(chunk)
             )
-            for chunk in self._chunks
+            for chunk in tqdm(
+                self._chunks,
+                desc="Tokenizing chunks",
+                unit="chunk",
+                **PROGRESS_BAR_STYLE,
+            )
         ]
 
         self._retriever = bm25s.BM25()

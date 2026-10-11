@@ -10,3 +10,13 @@ DEFAULT_INDEX_DIRECTORY = "data/processed/bm25"
 MODEL_NAME = "Qwen/Qwen3-0.6B"
 DEFAULT_MAX_CONTEXT_TOKENS = 2500
 DEFAULT_MAX_NEW_TOKENS = 160
+
+# Look of every progress bar: the "circles" style.
+PROGRESS_BAR_STYLE = {
+    "ascii": "○●",
+    "bar_format": (
+        "{desc:<20} {bar:20} {percentage:3.0f}%  "
+        "{n_fmt}/{total_fmt}  {elapsed}"
+    ),
+    "colour": "#D85A30",
+}
