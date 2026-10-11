@@ -4,11 +4,14 @@ import re
 from abc import ABC, abstractmethod
 from typing import Any
 
+from src.config import (
+    DEFAULT_MAX_CONTEXT_TOKENS,
+    DEFAULT_MAX_NEW_TOKENS,
+    MODEL_NAME,
+)
 from src.models import SourceExcerpt
 from src.prompting import SYSTEM_PROMPT, PromptBuilder
 
-
-MODEL_NAME = "Qwen/Qwen3-0.6B"
 
 NO_CONTEXT_ANSWER = (
     "The provided context does not contain the answer."
@@ -35,8 +38,8 @@ class QwenAnswerGenerator(AnswerGenerator):
     def __init__(
         self,
         model_name: str = MODEL_NAME,
-        max_context_tokens: int = 2500,
-        max_new_tokens: int = 160,
+        max_context_tokens: int = DEFAULT_MAX_CONTEXT_TOKENS,
+        max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
         device: str | None = None,
     ) -> None:
         """Configure the generator without loading the model.

@@ -39,7 +39,7 @@ class CodeAwareTokenizer(TextTokenizer):
     )
 
     TOKEN_PATTERN = re.compile(
-        r"[A-Za-z_][A-Za-z0-9_.]*|\d+"
+        r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)*|\d+"
     )
     IDENTIFIER_PATTERN = re.compile(
         r"[A-Z]+(?=[A-Z][a-z]|\d|\b)|"
@@ -58,7 +58,7 @@ class CodeAwareTokenizer(TextTokenizer):
     @property
     def name(self) -> str:
         """Return the tokenizer version stored in the index."""
-        return "code-aware-v2"
+        return "code-aware-v3"
 
     def tokenize(self, text: str) -> list[str]:
         """Return stemmed identifiers and their component words.

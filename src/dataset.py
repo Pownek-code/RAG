@@ -13,6 +13,29 @@ from src.models import (
 from src.retrieval import QuestionRetriever
 
 
+def resolve_output_path(input_path: Path, save_directory: Path) -> Path:
+    """Return where the results for ``input_path`` are written.
+
+    The output keeps the input's file name inside ``save_directory``.
+
+    Args:
+        input_path: The file that is being read.
+        save_directory: The directory that receives the output.
+
+    Raises:
+        ValueError: If the output would be the input file itself, which
+            would replace the input with the results.
+    """
+    output_path = save_directory / input_path.name
+
+    if output_path.resolve() == input_path.resolve():
+        raise ValueError(
+            f"Output would overwrite the input file: {input_path}"
+        )
+
+    return output_path
+
+
 class JsonFileReader:
     """Reads JSON files as text."""
 
@@ -200,7 +223,12 @@ class DatasetSearcher:
 
         Returns:
             The path of the saved results.
+
+        Raises:
+            ValueError: If ``save_directory`` would overwrite the dataset.
         """
+        output_path = resolve_output_path(dataset_path, save_directory)
+
         dataset = self._dataset_loader.load(
             dataset_path
         )
@@ -208,10 +236,6 @@ class DatasetSearcher:
         results = self.search(
             dataset=dataset,
             k=k,
-        )
-
-        output_path = (
-            save_directory / dataset_path.name
         )
 
         return self._results_writer.save(

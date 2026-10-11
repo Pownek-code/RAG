@@ -1,54 +1,14 @@
-"""Input validation and error formatting shared by the CLI commands."""
+"""Error handling shared by the CLI commands."""
+
+import functools
+from collections.abc import Callable
+from typing import ParamSpec
 
 from pydantic import ValidationError
 
 _MAX_REPORTED_ERRORS = 3
 
-
-def require_positive_int(name: str, value: object) -> int:
-    """Return ``value`` if it is an integer greater than zero.
-
-    Python Fire guesses the type of each argument, so ``--k abc``
-    arrives as a string and ``--k 5.5`` as a float. Checking here
-    turns those into a clear message instead of a ``TypeError``.
-
-    Args:
-        name: Argument name used in the error message.
-        value: The raw value received from the command line.
-
-    Returns:
-        The value as an ``int``.
-
-    Raises:
-        ValueError: If the value is not a positive integer.
-    """
-    if (
-        isinstance(value, bool)
-        or not isinstance(value, int)
-        or value <= 0
-    ):
-        raise ValueError(
-            f"{name} must be a positive integer, got {value!r}"
-        )
-
-    return value
-
-
-def require_text(name: str, value: object) -> str:
-    """Return ``value`` as text, rejecting empty or blank values.
-
-    Fire turns ``12345`` into an ``int`` and ``[1,2]`` into a list,
-    so the value is converted back to the text that was typed.
-
-    Raises:
-        ValueError: If the text is empty or only whitespace.
-    """
-    text = str(value)
-
-    if not text.strip():
-        raise ValueError(f"{name} cannot be empty")
-
-    return text
+_Parameters = ParamSpec("_Parameters")
 
 
 def format_error(error: Exception) -> str:
@@ -73,3 +33,34 @@ def format_error(error: Exception) -> str:
         shown.append(f"... and {hidden} more")
 
     return f"Error: invalid data ({'; '.join(shown)})"
+
+
+def handle_errors(
+    command: Callable[_Parameters, str],
+) -> Callable[_Parameters, str]:
+    """Turn the expected errors of a CLI command into an error message.
+
+    A command wrapped with this decorator returns ``Error: ...`` instead
+    of raising when the input is bad, a file is missing or the model
+    cannot run. Other exceptions are programming errors and still
+    propagate, so they are never hidden.
+
+    Args:
+        command: A CLI command that returns the text to print.
+
+    Returns:
+        The command with the same name, docstring and signature, so
+        Python Fire still builds the same options from it.
+    """
+
+    @functools.wraps(command)
+    def wrapper(
+        *args: _Parameters.args,
+        **kwargs: _Parameters.kwargs,
+    ) -> str:
+        try:
+            return command(*args, **kwargs)
+        except (OSError, ValueError, RuntimeError) as error:
+            return format_error(error)
+
+    return wrapper
