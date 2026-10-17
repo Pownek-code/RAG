@@ -17,6 +17,11 @@ class QuestionRetriever:
         """Store the index that is searched."""
         self._index = index
 
+    @property
+    def chunk_count(self) -> int:
+        """Return the number of chunks that can be retrieved."""
+        return self._index.chunk_count
+
     def search(
         self,
         question: UnansweredQuestion,

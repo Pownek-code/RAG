@@ -38,6 +38,10 @@ class AnswerService:
         self._context_loader = context_loader
         self._generator = generator
 
+    def load_model(self) -> None:
+        """Load the generation model ahead of the first answer."""
+        self._generator.load()
+
     def answer(
         self,
         search_result: MinimalSearchResults,

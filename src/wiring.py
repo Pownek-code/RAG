@@ -9,6 +9,7 @@ that decides which concrete class fills each role, so the command line
 from pathlib import Path
 
 from src.answering import AnswersWriter, AnswerService, DatasetAnswerer
+from src.api import RagApi
 from src.chunking import Chunker, DocumentationChunker, PythonChunker
 from src.dataset import (
     DatasetLoader,
@@ -125,4 +126,22 @@ def build_dataset_answerer(
         answer_service=build_answer_service(settings, project_root),
         file_reader=JsonFileReader(),
         writer=AnswersWriter(),
+    )
+
+
+def build_api(
+    index_directory: Path,
+    settings: GenerationSettings,
+    project_root: Path,
+) -> RagApi:
+    """Return the HTTP API serving a saved index.
+
+    Args:
+        index_directory: Directory written by the ``index`` command.
+        settings: Model, token budgets and device for the answers.
+        project_root: Root that retrieved file paths are relative to.
+    """
+    return RagApi(
+        question_retriever=load_question_retriever(index_directory),
+        answer_service=build_answer_service(settings, project_root),
     )

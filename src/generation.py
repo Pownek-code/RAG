@@ -31,6 +31,12 @@ class AnswerGenerator(ABC):
     ) -> str:
         """Answer the question using only the excerpts."""
 
+    def load(self) -> None:
+        """Prepare the generator ahead of the first answer.
+
+        Generators with nothing heavy to load need not override this.
+        """
+
 
 class QwenAnswerGenerator(AnswerGenerator):
     """Answer generation with a local Qwen chat model."""
@@ -56,6 +62,14 @@ class QwenAnswerGenerator(AnswerGenerator):
         self._max_new_tokens = max_new_tokens
         self._tokenizer: Any = None
         self._model: Any = None
+
+    def load(self) -> None:
+        """Load the model now instead of at the first answer.
+
+        Raises:
+            RuntimeError: If the model cannot be loaded.
+        """
+        self._load()
 
     def generate(
         self,
