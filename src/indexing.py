@@ -34,6 +34,11 @@ class BM25Index:
         self._retriever: bm25s.BM25 | None = None
         self._chunks: list[SourceChunk] = []
 
+    @property
+    def chunk_count(self) -> int:
+        """Return the number of chunks in the index."""
+        return len(self._chunks)
+
     def build(self, chunks: list[SourceChunk]) -> None:
         """Index the chunks, ordered by file and character range.
 

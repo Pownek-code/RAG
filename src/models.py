@@ -6,6 +6,7 @@ from typing import List
 from pydantic import BaseModel, Field, model_validator
 
 from src.ingestion.models import DocumentType
+from src.settings import CommandInputs, NonBlankText, PositiveInteger
 
 
 class MinimalSource(BaseModel):
@@ -200,3 +201,17 @@ class SourceExcerpt(BaseModel):
             )
 
         return self
+
+
+class SearchBody(CommandInputs):
+    """Body of an API search request: the question and how many sources."""
+
+    question: NonBlankText
+    k: PositiveInteger
+
+
+class HealthStatus(BaseModel):
+    """Answer of the API health check."""
+
+    status: str
+    chunk_count: int

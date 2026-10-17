@@ -11,6 +11,10 @@ MODEL_NAME = "Qwen/Qwen3-0.6B"
 DEFAULT_MAX_CONTEXT_TOKENS = 2500
 DEFAULT_MAX_NEW_TOKENS = 160
 
+# The API listens on this machine only, unless told otherwise.
+DEFAULT_API_HOST = "127.0.0.1"
+DEFAULT_API_PORT = 8000
+
 # Look of every progress bar: the "circles" style.
 PROGRESS_BAR_STYLE = {
     "ascii": "○●",

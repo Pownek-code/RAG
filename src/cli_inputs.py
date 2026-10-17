@@ -6,7 +6,14 @@ below from its arguments; the model checks every field and raises a
 ``ValidationError`` listing all the problems at once.
 """
 
+from typing import Annotated
+
+from pydantic import Field
+
 from src.settings import CommandInputs, NonBlankText, PositiveInteger
+
+
+PortNumber = Annotated[int, Field(strict=True, ge=1, le=65535)]
 
 
 class IndexRequest(CommandInputs):
@@ -46,3 +53,11 @@ class EvaluateRequest(CommandInputs):
 
     student_search_results_path: NonBlankText
     dataset_path: NonBlankText
+
+
+class ServeRequest(CommandInputs):
+    """Arguments of the ``serve`` command."""
+
+    host: NonBlankText
+    port: PortNumber
+    index_directory: NonBlankText

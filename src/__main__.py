@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import fire
+import uvicorn
 
 from src.cli_inputs import (
     AnswerDatasetRequest,
@@ -10,9 +11,12 @@ from src.cli_inputs import (
     IndexRequest,
     SearchDatasetRequest,
     SearchRequest,
+    ServeRequest,
 )
 from src.cli_support import handle_errors
 from src.config import (
+    DEFAULT_API_HOST,
+    DEFAULT_API_PORT,
     DEFAULT_INDEX_DIRECTORY,
     DEFAULT_MAX_CONTEXT_TOKENS,
     DEFAULT_MAX_NEW_TOKENS,
@@ -24,6 +28,7 @@ from src.models import UnansweredQuestion
 from src.settings import GenerationSettings
 from src.wiring import (
     build_answer_service,
+    build_api,
     build_dataset_answerer,
     build_dataset_loader,
     build_dataset_searcher,
@@ -287,6 +292,58 @@ class CLI:
             f"Recall@{student_results.k}: "
             f"{recall:.3f}"
         )
+
+    @handle_errors
+    def serve(
+        self,
+        host: str = DEFAULT_API_HOST,
+        port: int = DEFAULT_API_PORT,
+        index_directory: str = DEFAULT_INDEX_DIRECTORY,
+        model_name: str = MODEL_NAME,
+        max_context_tokens: int = DEFAULT_MAX_CONTEXT_TOKENS,
+        max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
+        device: str | None = None,
+    ) -> str:
+        """Serve search and answers over a local HTTP API.
+
+        The index and the model are loaded before the server starts, so
+        no request waits for them. The server runs until it is
+        interrupted with Ctrl+C.
+
+        Args:
+            host: Address to listen on.
+            port: Port to listen on.
+            index_directory: Directory containing the saved index.
+            model_name: Hugging Face name of the generation model.
+            max_context_tokens: Token budget for the retrieved context.
+            max_new_tokens: Maximum number of generated tokens.
+            device: ``cuda``, ``mps`` or ``cpu``; detected when omitted.
+
+        Returns:
+            A message when the server stops, or an ``Error: ...`` message.
+        """
+        request = ServeRequest(
+            host=host,
+            port=port,
+            index_directory=index_directory,
+        )
+        settings = GenerationSettings(
+            model_name=model_name,
+            max_context_tokens=max_context_tokens,
+            max_new_tokens=max_new_tokens,
+            device=device,
+        )
+
+        api = build_api(
+            Path(request.index_directory), settings, Path.cwd()
+        )
+
+        print(f"Loading {settings.model_name} ...", flush=True)
+        api.load_model()
+
+        uvicorn.run(api.app, host=request.host, port=request.port)
+
+        return "Server stopped."
 
 
 if __name__ == "__main__":
