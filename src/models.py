@@ -150,6 +150,24 @@ class SourceChunk(BaseModel):
 
         return self
 
+    @property
+    def searchable_text(self) -> str:
+        """Return the text that every index uses to find this chunk."""
+        return f"{self.file_path}\n{self.context}\n{self.content}"
+
+    @property
+    def sort_key(self) -> tuple[str, int, int]:
+        """Return the key that orders chunks by file and character range.
+
+        Every index numbers its chunks in this order, so the same number
+        means the same chunk in all of them.
+        """
+        return (
+            self.file_path,
+            self.first_character_index,
+            self.last_character_index,
+        )
+
 
 class RankedChunk(BaseModel):
     """A chunk with its retrieval score."""

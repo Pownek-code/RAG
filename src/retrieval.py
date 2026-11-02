@@ -1,7 +1,9 @@
 """Retrieval of source locations for a question."""
 
+from enum import Enum
+
 from src.config import MAX_CHUNK_SIZE
-from src.indexing import BM25Index
+from src.indexing import ChunkSearcher
 from src.models import (
     MinimalSearchResults,
     MinimalSource,
@@ -10,11 +12,22 @@ from src.models import (
 )
 
 
+class RetrievalMethod(str, Enum):
+    """How chunks are ranked for a question."""
+
+    BM25 = "bm25"
+    SEMANTIC = "semantic"
+
+
 class QuestionRetriever:
     """Turns a question into ranked source locations."""
 
-    def __init__(self, index: BM25Index) -> None:
-        """Store the index that is searched."""
+    def __init__(self, index: ChunkSearcher) -> None:
+        """Store the index that is searched.
+
+        Args:
+            index: Any index that ranks chunks, lexical or semantic.
+        """
         self._index = index
 
     @property

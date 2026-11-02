@@ -21,10 +21,12 @@ from src.config import (
     DEFAULT_MAX_CONTEXT_TOKENS,
     DEFAULT_MAX_NEW_TOKENS,
     DEFAULT_REPOSITORY_PATH,
+    DEFAULT_SEMANTIC_DIRECTORY,
     MAX_CHUNK_SIZE,
     MODEL_NAME,
 )
 from src.models import UnansweredQuestion
+from src.retrieval import RetrievalMethod
 from src.settings import GenerationSettings
 from src.wiring import (
     build_answer_service,
@@ -53,13 +55,20 @@ class CLI:
         max_chunk_size: int = MAX_CHUNK_SIZE,
         repository_path: str = DEFAULT_REPOSITORY_PATH,
         index_directory: str = DEFAULT_INDEX_DIRECTORY,
+        semantic: bool = False,
+        semantic_directory: str = DEFAULT_SEMANTIC_DIRECTORY,
     ) -> str:
         """Chunk the corpus and build the persistent BM25 index.
+
+        With ``--semantic``, a vector index is also built from the same
+        chunks.
 
         Args:
             max_chunk_size: Maximum chunk length in characters.
             repository_path: Directory containing the corpus to ingest.
-            index_directory: Directory where the index is saved.
+            index_directory: Directory where the BM25 index is saved.
+            semantic: Also build the semantic vector index.
+            semantic_directory: Directory where the semantic index is saved.
 
         Returns:
             A completion message, or an ``Error: ...`` message.
@@ -68,21 +77,38 @@ class CLI:
             max_chunk_size=max_chunk_size,
             repository_path=repository_path,
             index_directory=index_directory,
+            semantic=semantic,
+            semantic_directory=semantic_directory,
         )
 
-        pipeline = build_indexing_pipeline(request.max_chunk_size)
+        pipeline = build_indexing_pipeline(
+            request.max_chunk_size,
+            semantic=request.semantic,
+        )
 
         chunk_count = pipeline.run(
             repository_path=Path(request.repository_path),
             project_root=Path.cwd(),
             index_directory=Path(request.index_directory),
+            semantic_directory=(
+                Path(request.semantic_directory)
+                if request.semantic
+                else None
+            ),
         )
 
-        return (
+        message = (
             "Indexing complete! "
             f"Indexed {chunk_count} chunks. "
             f"Index saved under {request.index_directory}"
         )
+
+        if request.semantic:
+            message += (
+                f"\nSemantic index saved under {request.semantic_directory}"
+            )
+
+        return message
 
     @handle_errors
     def search(
@@ -90,6 +116,8 @@ class CLI:
         query: str,
         k: int = 5,
         index_directory: str = DEFAULT_INDEX_DIRECTORY,
+        method: str = RetrievalMethod.BM25.value,
+        semantic_directory: str = DEFAULT_SEMANTIC_DIRECTORY,
     ) -> str:
         """Return the top-k sources for a single query as JSON.
 
@@ -97,18 +125,26 @@ class CLI:
             query: The question to search for.
             k: Number of sources to return.
             index_directory: Directory containing the saved index.
+            method: ``bm25`` or ``semantic``.
+            semantic_directory: Directory containing the semantic index.
 
         Returns:
             ``MinimalSearchResults`` JSON, or an ``Error: ...`` message.
         """
-        request = SearchRequest(
-            query=query,
-            k=k,
-            index_directory=index_directory,
+        request = SearchRequest.model_validate(
+            {
+                "query": query,
+                "k": k,
+                "index_directory": index_directory,
+                "method": method,
+                "semantic_directory": semantic_directory,
+            }
         )
 
         question_retriever = load_question_retriever(
-            Path(request.index_directory)
+            Path(request.index_directory),
+            request.method,
+            Path(request.semantic_directory),
         )
 
         result = question_retriever.search(
@@ -125,6 +161,8 @@ class CLI:
         k: int,
         save_directory: str,
         index_directory: str = DEFAULT_INDEX_DIRECTORY,
+        method: str = RetrievalMethod.BM25.value,
+        semantic_directory: str = DEFAULT_SEMANTIC_DIRECTORY,
     ) -> str:
         """Search every question of a dataset and save the results.
 
@@ -134,19 +172,29 @@ class CLI:
             save_directory: Directory receiving the results file, which
                 keeps the dataset's file name.
             index_directory: Directory containing the saved index.
+            method: ``bm25`` or ``semantic``.
+            semantic_directory: Directory containing the semantic index.
 
         Returns:
             A message with the output path, or an ``Error: ...`` message.
         """
-        request = SearchDatasetRequest(
-            dataset_path=dataset_path,
-            k=k,
-            save_directory=save_directory,
-            index_directory=index_directory,
+        request = SearchDatasetRequest.model_validate(
+            {
+                "dataset_path": dataset_path,
+                "k": k,
+                "save_directory": save_directory,
+                "index_directory": index_directory,
+                "method": method,
+                "semantic_directory": semantic_directory,
+            }
         )
 
         dataset_searcher = build_dataset_searcher(
-            load_question_retriever(Path(request.index_directory))
+            load_question_retriever(
+                Path(request.index_directory),
+                request.method,
+                Path(request.semantic_directory),
+            )
         )
 
         output_path = dataset_searcher.search_file(
@@ -163,6 +211,8 @@ class CLI:
         query: str,
         k: int = 5,
         index_directory: str = DEFAULT_INDEX_DIRECTORY,
+        method: str = RetrievalMethod.BM25.value,
+        semantic_directory: str = DEFAULT_SEMANTIC_DIRECTORY,
         model_name: str = MODEL_NAME,
         max_context_tokens: int = DEFAULT_MAX_CONTEXT_TOKENS,
         max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
@@ -174,6 +224,8 @@ class CLI:
             query: The question to answer.
             k: Number of sources to retrieve as context.
             index_directory: Directory containing the saved index.
+            method: ``bm25`` or ``semantic``.
+            semantic_directory: Directory containing the semantic index.
             model_name: Hugging Face name of the generation model.
             max_context_tokens: Token budget for the retrieved context.
             max_new_tokens: Maximum number of generated tokens.
@@ -182,10 +234,14 @@ class CLI:
         Returns:
             ``MinimalAnswer`` JSON, or an ``Error: ...`` message.
         """
-        request = SearchRequest(
-            query=query,
-            k=k,
-            index_directory=index_directory,
+        request = SearchRequest.model_validate(
+            {
+                "query": query,
+                "k": k,
+                "index_directory": index_directory,
+                "method": method,
+                "semantic_directory": semantic_directory,
+            }
         )
         settings = GenerationSettings(
             model_name=model_name,
@@ -195,7 +251,9 @@ class CLI:
         )
 
         question_retriever = load_question_retriever(
-            Path(request.index_directory)
+            Path(request.index_directory),
+            request.method,
+            Path(request.semantic_directory),
         )
 
         search_result = question_retriever.search(
@@ -299,6 +357,8 @@ class CLI:
         host: str = DEFAULT_API_HOST,
         port: int = DEFAULT_API_PORT,
         index_directory: str = DEFAULT_INDEX_DIRECTORY,
+        method: str = RetrievalMethod.BM25.value,
+        semantic_directory: str = DEFAULT_SEMANTIC_DIRECTORY,
         model_name: str = MODEL_NAME,
         max_context_tokens: int = DEFAULT_MAX_CONTEXT_TOKENS,
         max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
@@ -306,7 +366,7 @@ class CLI:
     ) -> str:
         """Serve search and answers over a local HTTP API.
 
-        The index and the model are loaded before the server starts, so
+        The index and the models are loaded before the server starts, so
         no request waits for them. The server runs until it is
         interrupted with Ctrl+C.
 
@@ -314,6 +374,8 @@ class CLI:
             host: Address to listen on.
             port: Port to listen on.
             index_directory: Directory containing the saved index.
+            method: ``bm25`` or ``semantic``.
+            semantic_directory: Directory containing the semantic index.
             model_name: Hugging Face name of the generation model.
             max_context_tokens: Token budget for the retrieved context.
             max_new_tokens: Maximum number of generated tokens.
@@ -322,10 +384,14 @@ class CLI:
         Returns:
             A message when the server stops, or an ``Error: ...`` message.
         """
-        request = ServeRequest(
-            host=host,
-            port=port,
-            index_directory=index_directory,
+        request = ServeRequest.model_validate(
+            {
+                "host": host,
+                "port": port,
+                "index_directory": index_directory,
+                "method": method,
+                "semantic_directory": semantic_directory,
+            }
         )
         settings = GenerationSettings(
             model_name=model_name,
@@ -334,8 +400,13 @@ class CLI:
             device=device,
         )
 
+        print(f"Loading the {request.method.value} index ...", flush=True)
         api = build_api(
-            Path(request.index_directory), settings, Path.cwd()
+            index_directory=Path(request.index_directory),
+            method=request.method,
+            semantic_directory=Path(request.semantic_directory),
+            settings=settings,
+            project_root=Path.cwd(),
         )
 
         print(f"Loading {settings.model_name} ...", flush=True)

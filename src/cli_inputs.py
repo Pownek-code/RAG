@@ -8,8 +8,9 @@ below from its arguments; the model checks every field and raises a
 
 from typing import Annotated
 
-from pydantic import Field
+from pydantic import Field, StrictBool
 
+from src.retrieval import RetrievalMethod
 from src.settings import CommandInputs, NonBlankText, PositiveInteger
 
 
@@ -22,6 +23,8 @@ class IndexRequest(CommandInputs):
     max_chunk_size: PositiveInteger
     repository_path: NonBlankText
     index_directory: NonBlankText
+    semantic: StrictBool
+    semantic_directory: NonBlankText
 
 
 class SearchRequest(CommandInputs):
@@ -30,6 +33,8 @@ class SearchRequest(CommandInputs):
     query: NonBlankText
     k: PositiveInteger
     index_directory: NonBlankText
+    method: RetrievalMethod
+    semantic_directory: NonBlankText
 
 
 class SearchDatasetRequest(CommandInputs):
@@ -39,6 +44,8 @@ class SearchDatasetRequest(CommandInputs):
     k: PositiveInteger
     save_directory: NonBlankText
     index_directory: NonBlankText
+    method: RetrievalMethod
+    semantic_directory: NonBlankText
 
 
 class AnswerDatasetRequest(CommandInputs):
@@ -61,3 +68,5 @@ class ServeRequest(CommandInputs):
     host: NonBlankText
     port: PortNumber
     index_directory: NonBlankText
+    method: RetrievalMethod
+    semantic_directory: NonBlankText

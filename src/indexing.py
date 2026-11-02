@@ -1,6 +1,7 @@
 """Persistent BM25 index over source chunks."""
 
 import json
+from abc import ABC, abstractmethod
 from pathlib import Path
 
 import bm25s
@@ -11,7 +12,24 @@ from src.models import RankedChunk, SourceChunk
 from src.tokenization import TextTokenizer
 
 
-class BM25Index:
+class ChunkSearcher(ABC):
+    """An index that ranks the chunks it holds for a query."""
+
+    @property
+    @abstractmethod
+    def chunk_count(self) -> int:
+        """Return the number of chunks in the index."""
+
+    @abstractmethod
+    def search(
+        self,
+        query: str,
+        top_k: int = 5,
+    ) -> list[RankedChunk]:
+        """Return the best chunks for a query, best first."""
+
+
+class BM25Index(ChunkSearcher):
     """Lexical index that ranks chunks with BM25.
 
     The searchable text of a chunk is its file path, its context (such
@@ -39,6 +57,11 @@ class BM25Index:
         """Return the number of chunks in the index."""
         return len(self._chunks)
 
+    @property
+    def chunks(self) -> list[SourceChunk]:
+        """Return the indexed chunks in index order; do not modify."""
+        return self._chunks
+
     def build(self, chunks: list[SourceChunk]) -> None:
         """Index the chunks, ordered by file and character range.
 
@@ -50,19 +73,10 @@ class BM25Index:
                 "Cannot build an index without source chunks"
             )
 
-        self._chunks = sorted(
-            chunks,
-            key=lambda chunk: (
-                chunk.file_path,
-                chunk.first_character_index,
-                chunk.last_character_index,
-            ),
-        )
+        self._chunks = sorted(chunks, key=lambda chunk: chunk.sort_key)
 
         tokenized_corpus = [
-            self.tokenizer.tokenize(
-                self._searchable_text(chunk)
-            )
+            self.tokenizer.tokenize(chunk.searchable_text)
             for chunk in tqdm(
                 self._chunks,
                 desc="Tokenizing chunks",
@@ -218,13 +232,6 @@ class BM25Index:
             )
 
         return instance
-
-    @staticmethod
-    def _searchable_text(chunk: SourceChunk) -> str:
-        """Return the text that is tokenized and indexed for a chunk."""
-        return (
-            f"{chunk.file_path}\n{chunk.context}\n{chunk.content}"
-        )
 
     def _require_retriever(self) -> bm25s.BM25:
         """Return the BM25 engine or fail if there is none."""
