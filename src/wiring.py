@@ -18,16 +18,18 @@ from src.dataset import (
     SearchResultsLoader,
     SearchResultsWriter,
 )
+from src.embedding import MiniLMEmbedder
 from src.evaluation import RetrievalEvaluator
 from src.generation import QwenAnswerGenerator
 from src.index_pipeline import IndexingPipeline
 from src.indexing import BM25Index
 from src.ingestion.loader import FileReader, RepositoryLoader
 from src.ingestion.models import DocumentType
-from src.retrieval import QuestionRetriever
+from src.retrieval import QuestionRetriever, RetrievalMethod
 from src.settings import GenerationSettings
 from src.source_context import SourceContextLoader
 from src.tokenization import CodeAwareTokenizer
+from src.vector_index import VectorIndex
 
 
 def build_tokenizer() -> CodeAwareTokenizer:
@@ -39,8 +41,25 @@ def build_tokenizer() -> CodeAwareTokenizer:
     return CodeAwareTokenizer()
 
 
-def build_indexing_pipeline(max_chunk_size: int) -> IndexingPipeline:
-    """Return a pipeline that loads, chunks and indexes a repository."""
+def build_embedder() -> MiniLMEmbedder:
+    """Return the embedder used both to build a vector index and to query it.
+
+    It is created here and nowhere else, so a vector index and the
+    queries sent to it cannot end up using different models.
+    """
+    return MiniLMEmbedder()
+
+
+def build_indexing_pipeline(
+    max_chunk_size: int,
+    semantic: bool = False,
+) -> IndexingPipeline:
+    """Return a pipeline that loads, chunks and indexes a repository.
+
+    Args:
+        max_chunk_size: Maximum chunk length in characters.
+        semantic: Also build the semantic vector index.
+    """
     chunkers: dict[DocumentType, Chunker] = {
         DocumentType.PYTHON: PythonChunker(max_chunk_size=max_chunk_size),
         DocumentType.DOCUMENTATION: DocumentationChunker(
@@ -52,17 +71,43 @@ def build_indexing_pipeline(max_chunk_size: int) -> IndexingPipeline:
         loader=RepositoryLoader(file_reader=FileReader()),
         chunkers=chunkers,
         index=BM25Index(tokenizer=build_tokenizer()),
+        vector_index=(
+            VectorIndex(embedder=build_embedder()) if semantic else None
+        ),
     )
 
 
-def load_question_retriever(index_directory: Path) -> QuestionRetriever:
-    """Load a saved index and return a retriever that searches it."""
+def load_question_retriever(
+    index_directory: Path,
+    method: RetrievalMethod,
+    semantic_directory: Path,
+) -> QuestionRetriever:
+    """Load the saved index chosen by ``method`` and return its retriever.
+
+    The BM25 index is always loaded: it holds the chunks, and the
+    semantic vectors only number them.
+
+    Args:
+        index_directory: Directory written by the ``index`` command.
+        method: Which index ranks the chunks.
+        semantic_directory: Directory of the semantic index; only read
+            when ``method`` is semantic.
+    """
     index = BM25Index.load(
         directory=index_directory,
         tokenizer=build_tokenizer(),
     )
 
-    return QuestionRetriever(index=index)
+    if method is RetrievalMethod.BM25:
+        return QuestionRetriever(index=index)
+
+    vector_index = VectorIndex.load(
+        directory=semantic_directory,
+        embedder=build_embedder(),
+        chunks=index.chunks,
+    )
+
+    return QuestionRetriever(index=vector_index)
 
 
 def build_dataset_loader() -> DatasetLoader:
@@ -131,6 +176,8 @@ def build_dataset_answerer(
 
 def build_api(
     index_directory: Path,
+    method: RetrievalMethod,
+    semantic_directory: Path,
     settings: GenerationSettings,
     project_root: Path,
 ) -> RagApi:
@@ -138,10 +185,14 @@ def build_api(
 
     Args:
         index_directory: Directory written by the ``index`` command.
+        method: Which index ranks the chunks.
+        semantic_directory: Directory of the semantic index.
         settings: Model, token budgets and device for the answers.
         project_root: Root that retrieved file paths are relative to.
     """
     return RagApi(
-        question_retriever=load_question_retriever(index_directory),
+        question_retriever=load_question_retriever(
+            index_directory, method, semantic_directory
+        ),
         answer_service=build_answer_service(settings, project_root),
     )
