@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from pydantic import BaseModel
 from tqdm import tqdm
 
 from src.config import PROGRESS_BAR_STYLE
@@ -14,27 +15,60 @@ from src.models import (
 from src.retrieval import QuestionRetriever
 
 
-def resolve_output_path(input_path: Path, save_directory: Path) -> Path:
-    """Return where the results for ``input_path`` are written.
+class JsonResultsWriter:
+    """Writes a results file named after the file it was computed from.
 
-    The output keeps the input's file name inside ``save_directory``.
-
-    Args:
-        input_path: The file that is being read.
-        save_directory: The directory that receives the output.
-
-    Raises:
-        ValueError: If the output would be the input file itself, which
-            would replace the input with the results.
+    Callers ask for ``output_path`` before their expensive work, so a bad
+    save directory fails at once, and ``save`` the results at the end.
     """
-    output_path = save_directory / input_path.name
 
-    if output_path.resolve() == input_path.resolve():
-        raise ValueError(
-            f"Output would overwrite the input file: {input_path}"
+    def output_path(
+        self,
+        input_path: Path,
+        save_directory: Path,
+    ) -> Path:
+        """Return where the results for ``input_path`` are written.
+
+        The output keeps the input's file name inside ``save_directory``.
+
+        Args:
+            input_path: The file that is being read.
+            save_directory: The directory that receives the output.
+
+        Raises:
+            ValueError: If the output would be the input file itself, which
+                would replace the input with the results.
+        """
+        output_path = save_directory / input_path.name
+
+        if output_path.resolve() == input_path.resolve():
+            raise ValueError(
+                f"Output would overwrite the input file: {input_path}"
+            )
+
+        return output_path
+
+    def save(
+        self,
+        results: BaseModel,
+        output_path: Path,
+    ) -> Path:
+        """Write results as indented JSON, creating parent directories.
+
+        Returns:
+            The path that was written.
+        """
+        output_path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
         )
 
-    return output_path
+        output_path.write_text(
+            results.model_dump_json(indent=2),
+            encoding="utf-8",
+        )
+
+        return output_path
 
 
 class JsonFileReader:
@@ -120,32 +154,6 @@ class SearchResultsLoader:
         )
 
 
-class SearchResultsWriter:
-    """Writes search results as JSON."""
-
-    def save(
-        self,
-        results: StudentSearchResults,
-        output_path: Path,
-    ) -> Path:
-        """Write results as JSON, creating parent directories.
-
-        Returns:
-            The path that was written.
-        """
-        output_path.parent.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        output_path.write_text(
-            results.model_dump_json(indent=2),
-            encoding="utf-8",
-        )
-
-        return output_path
-
-
 class DatasetSearcher:
     """Runs retrieval for every question of a dataset."""
 
@@ -153,7 +161,7 @@ class DatasetSearcher:
         self,
         question_retriever: QuestionRetriever,
         dataset_loader: DatasetLoader,
-        results_writer: SearchResultsWriter,
+        results_writer: JsonResultsWriter,
     ) -> None:
         """Store the collaborators used to search a dataset.
 
@@ -229,7 +237,9 @@ class DatasetSearcher:
         Raises:
             ValueError: If ``save_directory`` would overwrite the dataset.
         """
-        output_path = resolve_output_path(dataset_path, save_directory)
+        output_path = self._results_writer.output_path(
+            dataset_path, save_directory
+        )
 
         dataset = self._dataset_loader.load(
             dataset_path

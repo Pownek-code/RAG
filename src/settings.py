@@ -10,18 +10,6 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 from pydantic_core import PydanticCustomError
 
 
-def _require_not_blank(value: str) -> str:
-    """Reject text that is empty or only whitespace; keep it as typed."""
-    if not value.strip():
-        raise PydanticCustomError("blank_text", "Text must not be blank")
-
-    return value
-
-
-PositiveInteger = Annotated[int, Field(strict=True, gt=0)]
-NonBlankText = Annotated[str, AfterValidator(_require_not_blank)]
-
-
 class CommandInputs(BaseModel):
     """Base of all validated inputs.
 
@@ -30,6 +18,21 @@ class CommandInputs(BaseModel):
     """
 
     model_config = ConfigDict(coerce_numbers_to_str=True)
+
+    @staticmethod
+    def _require_not_blank(value: str) -> str:
+        """Reject text that is empty or only whitespace; keep it as typed."""
+        if not value.strip():
+            raise PydanticCustomError("blank_text", "Text must not be blank")
+
+        return value
+
+
+PositiveInteger = Annotated[int, Field(strict=True, gt=0)]
+NonBlankText = Annotated[
+    str,
+    AfterValidator(CommandInputs._require_not_blank),
+]
 
 
 class GenerationSettings(CommandInputs):
