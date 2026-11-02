@@ -4,11 +4,45 @@ import ast
 import re
 from abc import ABC, abstractmethod
 from bisect import bisect_right
-from collections.abc import Callable
 
 from src.config import MAX_CHUNK_SIZE
 from src.ingestion.models import LoadedDocument
 from src.models import SourceChunk
+
+
+class SectionContext:
+    """The section path in force at each position of a document."""
+
+    def __init__(
+        self,
+        positions: list[int],
+        paths: list[str],
+    ) -> None:
+        """Store where each section starts and its path.
+
+        Args:
+            positions: Sorted start offsets of the sections.
+            paths: The section path for each start offset.
+
+        Raises:
+            ValueError: If the two lists differ in length.
+        """
+        if len(positions) != len(paths):
+            raise ValueError(
+                "Every section position needs exactly one path"
+            )
+
+        self._positions = positions
+        self._paths = paths
+
+    def at(self, start: int) -> str:
+        """Return the path of the last section starting at or before start.
+
+        A position before the first section has no context.
+        """
+        index = bisect_right(self._positions, start) - 1
+
+        return self._paths[index] if index >= 0 else ""
 
 
 class Chunker(ABC):
@@ -67,7 +101,7 @@ class Chunker(ABC):
             return []
 
         boundaries = self._prepare_boundaries(text)
-        context_at = self._build_context_finder(text)
+        context = self._build_context(text)
         chunks: list[SourceChunk] = []
         start = 0
 
@@ -89,7 +123,7 @@ class Chunker(ABC):
                     document=document,
                     start=start,
                     end=end,
-                    context=context_at(start),
+                    context=context.at(start),
                 )
             )
 
@@ -185,16 +219,16 @@ class Chunker(ABC):
             context=context,
         )
 
-    def _build_context_finder(
+    def _build_context(
         self,
         text: str,
-    ) -> Callable[[int], str]:
-        """Return a function giving the search context of a chunk start.
+    ) -> SectionContext:
+        """Return the search context of every position in the text.
 
         The default is no context. Subclasses override this to describe
         where in the document a chunk begins.
         """
-        return lambda start: ""
+        return SectionContext(positions=[], paths=[])
 
     @abstractmethod
     def _find_section_boundaries(
@@ -305,11 +339,11 @@ class DocumentationChunker(Chunker):
 
         return sorted(boundaries)
 
-    def _build_context_finder(
+    def _build_context(
         self,
         text: str,
-    ) -> Callable[[int], str]:
-        """Return the heading path in force where a chunk starts.
+    ) -> SectionContext:
+        """Return the heading path in force at every position.
 
         For a chunk inside "Quantization" > "Quark" the context is
         ``"Quantization Quark"``, so a question about Quark can match
@@ -336,10 +370,4 @@ class DocumentationChunker(Chunker):
                 )
             )
 
-        def context_at(start: int) -> str:
-            """Return the heading path of the last heading before start."""
-            index = bisect_right(positions, start) - 1
-
-            return heading_paths[index] if index >= 0 else ""
-
-        return context_at
+        return SectionContext(positions=positions, paths=heading_paths)

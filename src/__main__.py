@@ -1,9 +1,11 @@
 """Command-line interface of the RAG system (Python Fire)."""
 
+import sys
 from pathlib import Path
 
 import fire
 import uvicorn
+from pydantic import ValidationError
 
 from src.cli_inputs import (
     AnswerDatasetRequest,
@@ -13,7 +15,6 @@ from src.cli_inputs import (
     SearchRequest,
     ServeRequest,
 )
-from src.cli_support import handle_errors
 from src.config import (
     DEFAULT_API_HOST,
     DEFAULT_API_PORT,
@@ -28,28 +29,26 @@ from src.config import (
 from src.models import UnansweredQuestion
 from src.retrieval import RetrievalMethod
 from src.settings import GenerationSettings
-from src.wiring import (
-    build_answer_service,
-    build_api,
-    build_dataset_answerer,
-    build_dataset_loader,
-    build_dataset_searcher,
-    build_indexing_pipeline,
-    build_recall_evaluator,
-    build_search_results_loader,
-    load_question_retriever,
-)
+from src.wiring import Wiring
 
 
 class CLI:
     """Commands exposed as ``uv run python -m src <command>``.
 
-    Every command returns a string that Fire prints. Expected failures
-    (bad input, missing files, model problems) are returned as
-    ``Error: ...`` messages instead of raising tracebacks.
+    Every command returns a string that Fire prints. Failures are raised
+    and turned into an error message by ``Application``.
     """
 
-    @handle_errors
+    def __init__(self, wiring: Wiring | None = None) -> None:
+        """Store the wiring that builds the objects the commands use.
+
+        It is kept private: Fire turns public attributes into commands.
+
+        Args:
+            wiring: The object builder; a default one when omitted.
+        """
+        self._wiring = wiring or Wiring()
+
     def index(
         self,
         max_chunk_size: int = MAX_CHUNK_SIZE,
@@ -71,7 +70,7 @@ class CLI:
             semantic_directory: Directory where the semantic index is saved.
 
         Returns:
-            A completion message, or an ``Error: ...`` message.
+            A completion message.
         """
         request = IndexRequest(
             max_chunk_size=max_chunk_size,
@@ -81,7 +80,7 @@ class CLI:
             semantic_directory=semantic_directory,
         )
 
-        pipeline = build_indexing_pipeline(
+        pipeline = self._wiring.indexing_pipeline(
             request.max_chunk_size,
             semantic=request.semantic,
         )
@@ -110,7 +109,6 @@ class CLI:
 
         return message
 
-    @handle_errors
     def search(
         self,
         query: str,
@@ -129,7 +127,7 @@ class CLI:
             semantic_directory: Directory containing the semantic index.
 
         Returns:
-            ``MinimalSearchResults`` JSON, or an ``Error: ...`` message.
+            ``MinimalSearchResults`` JSON.
         """
         request = SearchRequest.model_validate(
             {
@@ -141,7 +139,7 @@ class CLI:
             }
         )
 
-        question_retriever = load_question_retriever(
+        question_retriever = self._wiring.question_retriever(
             Path(request.index_directory),
             request.method,
             Path(request.semantic_directory),
@@ -154,7 +152,6 @@ class CLI:
 
         return result.model_dump_json(indent=2)
 
-    @handle_errors
     def search_dataset(
         self,
         dataset_path: str,
@@ -176,7 +173,7 @@ class CLI:
             semantic_directory: Directory containing the semantic index.
 
         Returns:
-            A message with the output path, or an ``Error: ...`` message.
+            A message with the output path.
         """
         request = SearchDatasetRequest.model_validate(
             {
@@ -189,8 +186,8 @@ class CLI:
             }
         )
 
-        dataset_searcher = build_dataset_searcher(
-            load_question_retriever(
+        dataset_searcher = self._wiring.dataset_searcher(
+            self._wiring.question_retriever(
                 Path(request.index_directory),
                 request.method,
                 Path(request.semantic_directory),
@@ -205,7 +202,6 @@ class CLI:
 
         return f"Saved student_search_results to {output_path}"
 
-    @handle_errors
     def answer(
         self,
         query: str,
@@ -232,7 +228,7 @@ class CLI:
             device: ``cuda``, ``mps`` or ``cpu``; detected when omitted.
 
         Returns:
-            ``MinimalAnswer`` JSON, or an ``Error: ...`` message.
+            ``MinimalAnswer`` JSON.
         """
         request = SearchRequest.model_validate(
             {
@@ -250,7 +246,7 @@ class CLI:
             device=device,
         )
 
-        question_retriever = load_question_retriever(
+        question_retriever = self._wiring.question_retriever(
             Path(request.index_directory),
             request.method,
             Path(request.semantic_directory),
@@ -261,13 +257,12 @@ class CLI:
             k=request.k,
         )
 
-        answer_service = build_answer_service(settings, Path.cwd())
+        answer_service = self._wiring.answer_service(settings, Path.cwd())
 
         answer = answer_service.answer(search_result)
 
         return answer.model_dump_json(indent=2)
 
-    @handle_errors
     def answer_dataset(
         self,
         student_search_results_path: str,
@@ -289,7 +284,7 @@ class CLI:
             device: ``cuda``, ``mps`` or ``cpu``; detected when omitted.
 
         Returns:
-            A message with the output path, or an ``Error: ...`` message.
+            A message with the output path.
         """
         request = AnswerDatasetRequest(
             student_search_results_path=student_search_results_path,
@@ -302,7 +297,7 @@ class CLI:
             device=device,
         )
 
-        dataset_answerer = build_dataset_answerer(settings, Path.cwd())
+        dataset_answerer = self._wiring.dataset_answerer(settings, Path.cwd())
 
         output_path = dataset_answerer.answer_file(
             student_search_results_path=Path(
@@ -313,7 +308,6 @@ class CLI:
 
         return f"Saved student_search_results_and_answer to {output_path}"
 
-    @handle_errors
     def evaluate(
         self,
         student_search_results_path: str,
@@ -326,21 +320,21 @@ class CLI:
             dataset_path: Dataset with the reference sources.
 
         Returns:
-            The recall value, or an ``Error: ...`` message.
+            The recall value.
         """
         request = EvaluateRequest(
             student_search_results_path=student_search_results_path,
             dataset_path=dataset_path,
         )
 
-        ground_truth = build_dataset_loader().load_answered(
+        ground_truth = self._wiring.dataset_loader.load_answered(
             Path(request.dataset_path)
         )
-        student_results = build_search_results_loader().load(
+        student_results = self._wiring.search_results_loader.load(
             Path(request.student_search_results_path)
         )
 
-        recall = build_recall_evaluator().evaluate(
+        recall = self._wiring.recall_evaluator.evaluate(
             dataset=ground_truth,
             student_results=student_results,
         )
@@ -351,7 +345,6 @@ class CLI:
             f"{recall:.3f}"
         )
 
-    @handle_errors
     def serve(
         self,
         host: str = DEFAULT_API_HOST,
@@ -382,7 +375,7 @@ class CLI:
             device: ``cuda``, ``mps`` or ``cpu``; detected when omitted.
 
         Returns:
-            A message when the server stops, or an ``Error: ...`` message.
+            A message when the server stops.
         """
         request = ServeRequest.model_validate(
             {
@@ -401,7 +394,7 @@ class CLI:
         )
 
         print(f"Loading the {request.method.value} index ...", flush=True)
-        api = build_api(
+        api = self._wiring.api(
             index_directory=Path(request.index_directory),
             method=request.method,
             semantic_directory=Path(request.semantic_directory),
@@ -417,5 +410,57 @@ class CLI:
         return "Server stopped."
 
 
+class Application:
+    """Runs the command line and turns expected failures into one line.
+
+    Commands raise freely; this is the one place where an expected error
+    becomes a message for the user. Any other exception is a bug and is
+    left to show its traceback.
+    """
+
+    EXPECTED_ERRORS = (OSError, ValueError, RuntimeError)
+    MAX_REPORTED_ERRORS = 3
+
+    def __init__(self, cli: CLI) -> None:
+        """Store the command line to run."""
+        self._cli = cli
+
+    def run(self) -> None:
+        """Run the command given on the command line.
+
+        An expected error is printed on stderr as one ``Error: ...`` line
+        and the process exits with code 1, so scripts can detect it.
+        """
+        try:
+            fire.Fire(self._cli)
+        except self.EXPECTED_ERRORS as error:
+            print(self._describe(error), file=sys.stderr)
+            sys.exit(1)
+
+    @classmethod
+    def _describe(cls, error: Exception) -> str:
+        """Describe an expected error as a short, single-line message.
+
+        Pydantic validation errors are summarised (location and reason,
+        without the documentation links) and only the first few are
+        shown, so a dataset with many bad entries stays readable.
+        """
+        if not isinstance(error, ValidationError):
+            return f"Error: {error}"
+
+        details = error.errors()
+        shown = [
+            f"{'.'.join(str(part) for part in item['loc']) or 'input'}: "
+            f"{item['msg']}"
+            for item in details[:cls.MAX_REPORTED_ERRORS]
+        ]
+        hidden = len(details) - len(shown)
+
+        if hidden > 0:
+            shown.append(f"... and {hidden} more")
+
+        return f"Error: invalid data ({'; '.join(shown)})"
+
+
 if __name__ == "__main__":
-    fire.Fire(CLI())
+    Application(CLI()).run()

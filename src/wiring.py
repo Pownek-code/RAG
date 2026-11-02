@@ -1,22 +1,23 @@
 """Assembly of the pipeline objects.
 
 The classes of the pipeline receive their collaborators through their
-constructors and never create them. The functions here are the one place
-that decides which concrete class fills each role, so the command line
-(or any other front end) only asks for a ready-to-use object.
+constructors and never create them. ``Wiring`` is the one place that
+decides which concrete class fills each role, so the command line (or any
+other front end) only asks for a ready-to-use object.
 """
 
+from functools import cached_property
 from pathlib import Path
 
-from src.answering import AnswersWriter, AnswerService, DatasetAnswerer
+from src.answering import AnswerService, DatasetAnswerer
 from src.api import RagApi
 from src.chunking import Chunker, DocumentationChunker, PythonChunker
 from src.dataset import (
     DatasetLoader,
     DatasetSearcher,
     JsonFileReader,
+    JsonResultsWriter,
     SearchResultsLoader,
-    SearchResultsWriter,
 )
 from src.embedding import MiniLMEmbedder
 from src.evaluation import RetrievalEvaluator
@@ -32,167 +33,192 @@ from src.tokenization import CodeAwareTokenizer
 from src.vector_index import VectorIndex
 
 
-def build_tokenizer() -> CodeAwareTokenizer:
-    """Return the tokenizer used both to build an index and to query it.
+class Wiring:
+    """Builds the objects the commands need.
 
-    It is created here and nowhere else, so an index and the queries
-    sent to it cannot end up using different tokenizers.
+    Objects that take no command argument and must be shared are cached
+    properties: built on first use, then the same object for the rest of
+    the run. Objects that depend on command arguments are built by a
+    method on each call.
     """
-    return CodeAwareTokenizer()
 
+    @cached_property
+    def tokenizer(self) -> CodeAwareTokenizer:
+        """Return the tokenizer used both to build and to query an index.
 
-def build_embedder() -> MiniLMEmbedder:
-    """Return the embedder used both to build a vector index and to query it.
+        It is shared, so an index and the queries sent to it cannot end
+        up using different tokenizers.
+        """
+        return CodeAwareTokenizer()
 
-    It is created here and nowhere else, so a vector index and the
-    queries sent to it cannot end up using different models.
-    """
-    return MiniLMEmbedder()
+    @cached_property
+    def embedder(self) -> MiniLMEmbedder:
+        """Return the embedder used both to build and to query vectors.
 
+        It is shared, so its model is loaded at most once per run and a
+        vector index and its queries always use the same model.
+        """
+        return MiniLMEmbedder()
 
-def build_indexing_pipeline(
-    max_chunk_size: int,
-    semantic: bool = False,
-) -> IndexingPipeline:
-    """Return a pipeline that loads, chunks and indexes a repository.
+    @cached_property
+    def file_reader(self) -> FileReader:
+        """Return the reader of corpus and source files."""
+        return FileReader()
 
-    Args:
-        max_chunk_size: Maximum chunk length in characters.
-        semantic: Also build the semantic vector index.
-    """
-    chunkers: dict[DocumentType, Chunker] = {
-        DocumentType.PYTHON: PythonChunker(max_chunk_size=max_chunk_size),
-        DocumentType.DOCUMENTATION: DocumentationChunker(
-            max_chunk_size=max_chunk_size
-        ),
-    }
+    @cached_property
+    def json_reader(self) -> JsonFileReader:
+        """Return the reader of JSON datasets and results."""
+        return JsonFileReader()
 
-    return IndexingPipeline(
-        loader=RepositoryLoader(file_reader=FileReader()),
-        chunkers=chunkers,
-        index=BM25Index(tokenizer=build_tokenizer()),
-        vector_index=(
-            VectorIndex(embedder=build_embedder()) if semantic else None
-        ),
-    )
+    @cached_property
+    def results_writer(self) -> JsonResultsWriter:
+        """Return the writer of results files."""
+        return JsonResultsWriter()
 
+    @cached_property
+    def dataset_loader(self) -> DatasetLoader:
+        """Return the loader of question datasets."""
+        return DatasetLoader(file_reader=self.json_reader)
 
-def load_question_retriever(
-    index_directory: Path,
-    method: RetrievalMethod,
-    semantic_directory: Path,
-) -> QuestionRetriever:
-    """Load the saved index chosen by ``method`` and return its retriever.
+    @cached_property
+    def search_results_loader(self) -> SearchResultsLoader:
+        """Return the loader of saved search results."""
+        return SearchResultsLoader(file_reader=self.json_reader)
 
-    The BM25 index is always loaded: it holds the chunks, and the
-    semantic vectors only number them.
+    @cached_property
+    def recall_evaluator(self) -> RetrievalEvaluator:
+        """Return the evaluator that computes recall@k."""
+        return RetrievalEvaluator()
 
-    Args:
-        index_directory: Directory written by the ``index`` command.
-        method: Which index ranks the chunks.
-        semantic_directory: Directory of the semantic index; only read
-            when ``method`` is semantic.
-    """
-    index = BM25Index.load(
-        directory=index_directory,
-        tokenizer=build_tokenizer(),
-    )
+    def indexing_pipeline(
+        self,
+        max_chunk_size: int,
+        semantic: bool,
+    ) -> IndexingPipeline:
+        """Return a pipeline that loads, chunks and indexes a repository.
 
-    if method is RetrievalMethod.BM25:
-        return QuestionRetriever(index=index)
+        Args:
+            max_chunk_size: Maximum chunk length in characters.
+            semantic: Also build the semantic vector index.
+        """
+        chunkers: dict[DocumentType, Chunker] = {
+            DocumentType.PYTHON: PythonChunker(max_chunk_size=max_chunk_size),
+            DocumentType.DOCUMENTATION: DocumentationChunker(
+                max_chunk_size=max_chunk_size
+            ),
+        }
 
-    vector_index = VectorIndex.load(
-        directory=semantic_directory,
-        embedder=build_embedder(),
-        chunks=index.chunks,
-    )
+        return IndexingPipeline(
+            loader=RepositoryLoader(file_reader=self.file_reader),
+            chunkers=chunkers,
+            index=BM25Index(tokenizer=self.tokenizer),
+            vector_index=(
+                VectorIndex(embedder=self.embedder) if semantic else None
+            ),
+        )
 
-    return QuestionRetriever(index=vector_index)
+    def question_retriever(
+        self,
+        index_directory: Path,
+        method: RetrievalMethod,
+        semantic_directory: Path,
+    ) -> QuestionRetriever:
+        """Load the saved index chosen by ``method`` and return its retriever.
 
+        The BM25 index is always loaded: it holds the chunks, and the
+        semantic vectors only number them.
 
-def build_dataset_loader() -> DatasetLoader:
-    """Return a loader for question datasets."""
-    return DatasetLoader(file_reader=JsonFileReader())
+        Args:
+            index_directory: Directory written by the ``index`` command.
+            method: Which index ranks the chunks.
+            semantic_directory: Directory of the semantic index; only read
+                when ``method`` is semantic.
+        """
+        index = BM25Index.load(
+            directory=index_directory,
+            tokenizer=self.tokenizer,
+        )
 
+        if method is RetrievalMethod.BM25:
+            return QuestionRetriever(index=index)
 
-def build_search_results_loader() -> SearchResultsLoader:
-    """Return a loader for saved search results."""
-    return SearchResultsLoader(file_reader=JsonFileReader())
+        vector_index = VectorIndex.load(
+            directory=semantic_directory,
+            embedder=self.embedder,
+            chunks=index.chunks,
+        )
 
+        return QuestionRetriever(index=vector_index)
 
-def build_dataset_searcher(
-    question_retriever: QuestionRetriever,
-) -> DatasetSearcher:
-    """Return a searcher that runs retrieval for a whole dataset."""
-    return DatasetSearcher(
-        question_retriever=question_retriever,
-        dataset_loader=build_dataset_loader(),
-        results_writer=SearchResultsWriter(),
-    )
+    def dataset_searcher(
+        self,
+        question_retriever: QuestionRetriever,
+    ) -> DatasetSearcher:
+        """Return a searcher that runs retrieval for a whole dataset."""
+        return DatasetSearcher(
+            question_retriever=question_retriever,
+            dataset_loader=self.dataset_loader,
+            results_writer=self.results_writer,
+        )
 
+    def answer_service(
+        self,
+        settings: GenerationSettings,
+        project_root: Path,
+    ) -> AnswerService:
+        """Return a service that answers questions from retrieved sources.
 
-def build_recall_evaluator() -> RetrievalEvaluator:
-    """Return the evaluator that computes recall@k."""
-    return RetrievalEvaluator()
+        The model itself is only loaded when the first answer is generated.
 
+        Args:
+            settings: Model, token budgets and device for the generator.
+            project_root: Root that retrieved file paths are relative to.
+        """
+        return AnswerService(
+            context_loader=SourceContextLoader(
+                file_reader=self.file_reader,
+                project_root=project_root,
+            ),
+            generator=QwenAnswerGenerator(
+                model_name=settings.model_name,
+                max_context_tokens=settings.max_context_tokens,
+                max_new_tokens=settings.max_new_tokens,
+                device=settings.device,
+            ),
+        )
 
-def build_answer_service(
-    settings: GenerationSettings,
-    project_root: Path,
-) -> AnswerService:
-    """Return a service that answers questions from retrieved sources.
+    def dataset_answerer(
+        self,
+        settings: GenerationSettings,
+        project_root: Path,
+    ) -> DatasetAnswerer:
+        """Return an answerer that processes a whole search results file."""
+        return DatasetAnswerer(
+            answer_service=self.answer_service(settings, project_root),
+            file_reader=self.json_reader,
+            writer=self.results_writer,
+        )
 
-    The model itself is only loaded when the first answer is generated.
+    def api(
+        self,
+        index_directory: Path,
+        method: RetrievalMethod,
+        semantic_directory: Path,
+        settings: GenerationSettings,
+        project_root: Path,
+    ) -> RagApi:
+        """Return the HTTP API serving a saved index.
 
-    Args:
-        settings: Model, token budgets and device for the generator.
-        project_root: Root that retrieved file paths are relative to.
-    """
-    return AnswerService(
-        context_loader=SourceContextLoader(
-            file_reader=FileReader(),
-            project_root=project_root,
-        ),
-        generator=QwenAnswerGenerator(
-            model_name=settings.model_name,
-            max_context_tokens=settings.max_context_tokens,
-            max_new_tokens=settings.max_new_tokens,
-            device=settings.device,
-        ),
-    )
-
-
-def build_dataset_answerer(
-    settings: GenerationSettings,
-    project_root: Path,
-) -> DatasetAnswerer:
-    """Return an answerer that processes a whole search results file."""
-    return DatasetAnswerer(
-        answer_service=build_answer_service(settings, project_root),
-        file_reader=JsonFileReader(),
-        writer=AnswersWriter(),
-    )
-
-
-def build_api(
-    index_directory: Path,
-    method: RetrievalMethod,
-    semantic_directory: Path,
-    settings: GenerationSettings,
-    project_root: Path,
-) -> RagApi:
-    """Return the HTTP API serving a saved index.
-
-    Args:
-        index_directory: Directory written by the ``index`` command.
-        method: Which index ranks the chunks.
-        semantic_directory: Directory of the semantic index.
-        settings: Model, token budgets and device for the answers.
-        project_root: Root that retrieved file paths are relative to.
-    """
-    return RagApi(
-        question_retriever=load_question_retriever(
-            index_directory, method, semantic_directory
-        ),
-        answer_service=build_answer_service(settings, project_root),
-    )
+        Args:
+            index_directory: Directory written by the ``index`` command.
+            method: Which index ranks the chunks.
+            semantic_directory: Directory of the semantic index.
+            settings: Model, token budgets and device for the answers.
+            project_root: Root that retrieved file paths are relative to.
+        """
+        return RagApi(
+            question_retriever=self.question_retriever(
+                index_directory, method, semantic_directory
+            ),
+            answer_service=self.answer_service(settings, project_root),
+        )

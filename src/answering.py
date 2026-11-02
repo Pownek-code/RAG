@@ -6,7 +6,7 @@ from pathlib import Path
 from tqdm import tqdm
 
 from src.config import PROGRESS_BAR_STYLE
-from src.dataset import JsonFileReader, resolve_output_path
+from src.dataset import JsonFileReader, JsonResultsWriter
 from src.generation import AnswerGenerator
 from src.models import (
     MinimalAnswer,
@@ -106,32 +106,6 @@ class AnswerService:
         )
 
 
-class AnswersWriter:
-    """Writes answered search results as JSON."""
-
-    def save(
-        self,
-        results: StudentSearchResultsAndAnswer,
-        output_path: Path,
-    ) -> Path:
-        """Write answered results as JSON, creating parent directories.
-
-        Args:
-            results: The answers to write.
-            output_path: Destination file.
-
-        Returns:
-            The path that was written.
-        """
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(
-            results.model_dump_json(indent=2),
-            encoding="utf-8",
-        )
-
-        return output_path
-
-
 class DatasetAnswerer:
     """Reads search results and writes the generated answers."""
 
@@ -139,7 +113,7 @@ class DatasetAnswerer:
         self,
         answer_service: AnswerService,
         file_reader: JsonFileReader,
-        writer: AnswersWriter,
+        writer: JsonResultsWriter,
     ) -> None:
         """Store the collaborators used to answer a results file.
 
@@ -162,7 +136,7 @@ class DatasetAnswerer:
         Raises:
             ValueError: If ``save_directory`` would overwrite the input.
         """
-        output_path = resolve_output_path(
+        output_path = self._writer.output_path(
             student_search_results_path, save_directory
         )
 
