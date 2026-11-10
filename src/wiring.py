@@ -19,7 +19,7 @@ from src.dataset import (
     JsonResultsWriter,
     SearchResultsLoader,
 )
-from src.embedding import MiniLMEmbedder
+from src.embedding import SentenceTransformerEmbedder
 from src.evaluation import RetrievalEvaluator
 from src.generation import QwenAnswerGenerator
 from src.index_pipeline import IndexingPipeline
@@ -52,13 +52,13 @@ class Wiring:
         return CodeAwareTokenizer()
 
     @cached_property
-    def embedder(self) -> MiniLMEmbedder:
+    def embedder(self) -> SentenceTransformerEmbedder:
         """Return the embedder used both to build and to query vectors.
 
         It is shared, so its model is loaded at most once per run and a
         vector index and its queries always use the same model.
         """
-        return MiniLMEmbedder()
+        return SentenceTransformerEmbedder()
 
     @cached_property
     def file_reader(self) -> FileReader:

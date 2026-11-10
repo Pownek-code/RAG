@@ -151,9 +151,14 @@ class SourceChunk(BaseModel):
         return self
 
     @property
+    def search_header(self) -> str:
+        """Return the file path and context placed before the content."""
+        return f"{self.file_path}\n{self.context}\n"
+
+    @property
     def searchable_text(self) -> str:
         """Return the text that every index uses to find this chunk."""
-        return f"{self.file_path}\n{self.context}\n{self.content}"
+        return f"{self.search_header}{self.content}"
 
     @property
     def sort_key(self) -> tuple[str, int, int]:

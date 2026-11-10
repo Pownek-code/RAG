@@ -15,10 +15,22 @@ DEFAULT_MAX_NEW_TOKENS = 160
 DEFAULT_API_HOST = "127.0.0.1"
 DEFAULT_API_PORT = 8000
 
-# The semantic index. Text beyond the maximum sequence length (measured in
-# word pieces, not characters) is cut off before it is embedded.
-EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+# The semantic index. The model reads at most the maximum sequence length
+# (measured in word pieces, not characters), so longer chunks are split
+# into overlapping windows that each fit.
+EMBEDDING_MODEL_NAME = "intfloat/e5-small-v2"
+# Retrieval models are trained with a marker before questions and before
+# passages, given here as (query prefix, passage prefix) from each model
+# card. A model that is not listed gets no prefixes.
+EMBEDDING_PREFIXES = {
+    "intfloat/e5-small-v2": ("query: ", "passage: "),
+    "BAAI/bge-small-en-v1.5": (
+        "Represent this sentence for searching relevant passages: ",
+        "",
+    ),
+}
 EMBEDDING_MAX_SEQ_LENGTH = 256
+EMBEDDING_WINDOW_OVERLAP = 32
 EMBEDDING_BATCH_SIZE = 32
 DEFAULT_SEMANTIC_DIRECTORY = "data/processed/semantic"
 
