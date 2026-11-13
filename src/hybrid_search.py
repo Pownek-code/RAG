@@ -22,7 +22,7 @@ class HybridSearcher(ChunkSearcher):
     """
 
     RANK_CONSTANT = 60
-    CANDIDATE_DEPTH = 20
+    CANDIDATE_DEPTH = 10
     SEMANTIC_WEIGHT = 1.0
 
     def __init__(
