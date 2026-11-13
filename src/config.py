@@ -1,10 +1,18 @@
 """Limits and defaults shared across the project."""
 
+from src.models import DocumentType
+
 # The grader rejects any retrieved source longer than this, so no chunk
 # may exceed it.
 MAX_CHUNK_SIZE = 2000
 
 DEFAULT_REPOSITORY_PATH = "data/raw/vllm-0.10.1"
+# Files ingested from the repository, by extension, and how each is chunked.
+DOCUMENT_TYPE_BY_EXTENSION: dict[str, DocumentType] = {
+    ".py": DocumentType.PYTHON,
+    ".md": DocumentType.DOCUMENTATION,
+    ".txt": DocumentType.DOCUMENTATION,
+}
 DEFAULT_INDEX_DIRECTORY = "data/processed/bm25"
 
 MODEL_NAME = "Qwen/Qwen3-0.6B"

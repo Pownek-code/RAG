@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from src.ingestion.loader import FileReader
+from src.loader import FileReader
 from src.models import MinimalSource, SourceExcerpt
 
 

@@ -25,8 +25,8 @@ from src.generation import QwenAnswerGenerator
 from src.hybrid_search import HybridSearcher
 from src.index_pipeline import IndexingPipeline
 from src.indexing import BM25Index
-from src.ingestion.loader import FileReader, RepositoryLoader
-from src.ingestion.models import DocumentType
+from src.loader import FileReader, RepositoryLoader
+from src.models import DocumentType
 from src.retrieval import QuestionRetriever, RetrievalMethod
 from src.settings import GenerationSettings
 from src.source_context import SourceContextLoader
