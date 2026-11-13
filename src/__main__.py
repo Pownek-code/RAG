@@ -123,7 +123,7 @@ class CLI:
             query: The question to search for.
             k: Number of sources to return.
             index_directory: Directory containing the saved index.
-            method: ``bm25`` or ``semantic``.
+            method: ``bm25``, ``semantic`` or ``hybrid``.
             semantic_directory: Directory containing the semantic index.
 
         Returns:
@@ -169,7 +169,7 @@ class CLI:
             save_directory: Directory receiving the results file, which
                 keeps the dataset's file name.
             index_directory: Directory containing the saved index.
-            method: ``bm25`` or ``semantic``.
+            method: ``bm25``, ``semantic`` or ``hybrid``.
             semantic_directory: Directory containing the semantic index.
 
         Returns:
@@ -220,7 +220,7 @@ class CLI:
             query: The question to answer.
             k: Number of sources to retrieve as context.
             index_directory: Directory containing the saved index.
-            method: ``bm25`` or ``semantic``.
+            method: ``bm25``, ``semantic`` or ``hybrid``.
             semantic_directory: Directory containing the semantic index.
             model_name: Hugging Face name of the generation model.
             max_context_tokens: Token budget for the retrieved context.
@@ -367,7 +367,7 @@ class CLI:
             host: Address to listen on.
             port: Port to listen on.
             index_directory: Directory containing the saved index.
-            method: ``bm25`` or ``semantic``.
+            method: ``bm25``, ``semantic`` or ``hybrid``.
             semantic_directory: Directory containing the semantic index.
             model_name: Hugging Face name of the generation model.
             max_context_tokens: Token budget for the retrieved context.

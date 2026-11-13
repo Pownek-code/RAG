@@ -22,6 +22,7 @@ from src.dataset import (
 from src.embedding import SentenceTransformerEmbedder
 from src.evaluation import RetrievalEvaluator
 from src.generation import QwenAnswerGenerator
+from src.hybrid_search import HybridSearcher
 from src.index_pipeline import IndexingPipeline
 from src.indexing import BM25Index
 from src.ingestion.loader import FileReader, RepositoryLoader
@@ -126,13 +127,14 @@ class Wiring:
         """Load the saved index chosen by ``method`` and return its retriever.
 
         The BM25 index is always loaded: it holds the chunks, and the
-        semantic vectors only number them.
+        semantic vectors only number them. The hybrid method ranks with
+        both indexes and fuses their rankings.
 
         Args:
             index_directory: Directory written by the ``index`` command.
             method: Which index ranks the chunks.
             semantic_directory: Directory of the semantic index; only read
-                when ``method`` is semantic.
+                when ``method`` is semantic or hybrid.
         """
         index = BM25Index.load(
             directory=index_directory,
@@ -148,7 +150,15 @@ class Wiring:
             chunks=index.chunks,
         )
 
-        return QuestionRetriever(index=vector_index)
+        if method is RetrievalMethod.SEMANTIC:
+            return QuestionRetriever(index=vector_index)
+
+        return QuestionRetriever(
+            index=HybridSearcher(
+                lexical_index=index,
+                semantic_index=vector_index,
+            )
+        )
 
     def dataset_searcher(
         self,

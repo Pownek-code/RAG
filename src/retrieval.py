@@ -17,6 +17,7 @@ class RetrievalMethod(str, Enum):
 
     BM25 = "bm25"
     SEMANTIC = "semantic"
+    HYBRID = "hybrid"
 
 
 class QuestionRetriever:
