@@ -22,7 +22,6 @@ dependencies = [
 dev = [
     "flake8>=7.3.0",
     "mypy>=2.3.1",
-    "pytest>=9.1.1",
 ]
 
 [tool.mypy]
@@ -30,7 +29,3 @@ exclude = [
     "^data/",
     "^\\.venv/",
 ]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["."]
