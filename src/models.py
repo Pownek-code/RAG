@@ -1,12 +1,27 @@
 """Pydantic models exchanged between the pipeline stages."""
 
 import uuid
+from enum import Enum
 from typing import List
 
 from pydantic import BaseModel, Field, model_validator
 
-from src.ingestion.models import DocumentType
 from src.settings import CommandInputs, NonBlankText, PositiveInteger
+
+
+class DocumentType(str, Enum):
+    """Kind of document, which decides how it is chunked."""
+
+    PYTHON = "python"
+    DOCUMENTATION = "documentation"
+
+
+class LoadedDocument(BaseModel):
+    """A corpus file with its text and project-relative path."""
+
+    file_path: str
+    content: str
+    document_type: DocumentType
 
 
 class MinimalSource(BaseModel):

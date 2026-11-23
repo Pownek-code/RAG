@@ -3,8 +3,8 @@
 import logging
 from pathlib import Path
 
-from src.ingestion.file_types import DOCUMENT_TYPE_BY_EXTENSION
-from src.ingestion.models import DocumentType, LoadedDocument
+from src.config import DOCUMENT_TYPE_BY_EXTENSION
+from src.models import DocumentType, LoadedDocument
 
 
 logger = logging.getLogger(__name__)

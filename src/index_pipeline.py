@@ -7,8 +7,8 @@ from tqdm import tqdm
 from src.chunking import Chunker
 from src.config import PROGRESS_BAR_STYLE
 from src.indexing import BM25Index
-from src.ingestion.loader import RepositoryLoader
-from src.ingestion.models import DocumentType
+from src.loader import RepositoryLoader
+from src.models import DocumentType
 from src.models import SourceChunk
 from src.vector_index import VectorIndex
 

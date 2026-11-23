@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from bisect import bisect_right
 
 from src.config import MAX_CHUNK_SIZE
-from src.ingestion.models import LoadedDocument
+from src.models import LoadedDocument
 from src.models import SourceChunk
 
 
