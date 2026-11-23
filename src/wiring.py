@@ -11,7 +11,7 @@ from pathlib import Path
 
 from src.answering import AnswerService, DatasetAnswerer
 from src.api import RagApi
-from src.cache import IndexCache, QueryCache, fingerprint_files
+from src.cache import DiskCache, IndexCache, QueryCache
 from src.chunking import Chunker, DocumentationChunker, PythonChunker
 from src.config import DEFAULT_CACHE_DIRECTORY
 from src.dataset import (
@@ -152,7 +152,7 @@ class Wiring:
         index_version = BM25Index.version(index_directory)
 
         if method is not RetrievalMethod.BM25:
-            index_version = fingerprint_files(
+            index_version = DiskCache.fingerprint_files(
                 [
                     index_directory / BM25Index.MANIFEST_FILE_NAME,
                     index_directory / BM25Index.FILES_FILE_NAME,
