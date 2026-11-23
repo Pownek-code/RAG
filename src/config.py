@@ -42,6 +42,9 @@ EMBEDDING_WINDOW_OVERLAP = 32
 EMBEDDING_BATCH_SIZE = 32
 DEFAULT_SEMANTIC_DIRECTORY = "data/processed/semantic"
 
+# Disposable caches of the loaded index and of query results.
+DEFAULT_CACHE_DIRECTORY = "data/cache"
+
 # Look of every progress bar: the "circles" style.
 PROGRESS_BAR_STYLE = {
     "ascii": "○●",

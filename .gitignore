@@ -18,6 +18,7 @@ data/raw/
 data/datasets/
 data/processed/
 data/output/
+data/cache/
 
 # Model files
 *.safetensors
