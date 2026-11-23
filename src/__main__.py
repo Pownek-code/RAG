@@ -85,7 +85,7 @@ class CLI:
             semantic=request.semantic,
         )
 
-        chunk_count = pipeline.run(
+        report = pipeline.run(
             repository_path=Path(request.repository_path),
             project_root=Path.cwd(),
             index_directory=Path(request.index_directory),
@@ -98,13 +98,19 @@ class CLI:
 
         message = (
             "Indexing complete! "
-            f"Indexed {chunk_count} chunks. "
+            f"Indexed {report.chunk_count} chunks "
+            f"(files re-indexed: {report.reindexed_files}, "
+            f"reused: {report.reused_files}, "
+            f"removed: {report.removed_files}). "
             f"Index saved under {request.index_directory}"
         )
 
         if request.semantic:
+            embedded = report.embedded_chunks or 0
             message += (
-                f"\nSemantic index saved under {request.semantic_directory}"
+                f"\nSemantic index saved under {request.semantic_directory} "
+                f"(chunks embedded: {embedded}, "
+                f"reused: {report.chunk_count - embedded})"
             )
 
         return message
