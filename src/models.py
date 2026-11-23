@@ -1,12 +1,56 @@
-"""Pydantic models exchanged between the pipeline stages."""
+"""Pydantic models of the project and the field types they share.
+
+The input types come first: the command line and the HTTP API validate
+their input with the same rules. The models exchanged between the
+pipeline stages follow.
+"""
 
 import uuid
 from enum import Enum
-from typing import List
+from typing import Annotated, List
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    model_validator,
+)
+from pydantic_core import PydanticCustomError
 
-from src.settings import CommandInputs, NonBlankText, PositiveInteger
+
+class CommandInputs(BaseModel):
+    """Base of all validated inputs.
+
+    Numbers typed for a text field (for example the query ``12345``) are
+    converted to text instead of being rejected.
+    """
+
+    model_config = ConfigDict(coerce_numbers_to_str=True)
+
+    @staticmethod
+    def _require_not_blank(value: str) -> str:
+        """Reject text that is empty or only whitespace; keep it as typed."""
+        if not value.strip():
+            raise PydanticCustomError("blank_text", "Text must not be blank")
+
+        return value
+
+
+PositiveInteger = Annotated[int, Field(strict=True, gt=0)]
+NonBlankText = Annotated[
+    str,
+    AfterValidator(CommandInputs._require_not_blank),
+]
+
+
+class GenerationSettings(CommandInputs):
+    """How answers are generated: the model, its budgets and its device."""
+
+    model_name: NonBlankText
+    max_context_tokens: PositiveInteger
+    max_new_tokens: PositiveInteger
+    device: NonBlankText | None
 
 
 class DocumentType(str, Enum):

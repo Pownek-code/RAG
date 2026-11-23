@@ -11,7 +11,7 @@ from typing import Annotated
 from pydantic import Field, StrictBool
 
 from src.retrieval import RetrievalMethod
-from src.settings import CommandInputs, NonBlankText, PositiveInteger
+from src.models import CommandInputs, NonBlankText, PositiveInteger
 
 
 PortNumber = Annotated[int, Field(strict=True, ge=1, le=65535)]
