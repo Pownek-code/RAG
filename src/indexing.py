@@ -7,7 +7,7 @@ from pathlib import Path
 from tqdm import tqdm
 
 from src.bm25 import BM25Scorer
-from src.cache import IndexCache, fingerprint_files
+from src.cache import DiskCache, IndexCache
 from src.config import PROGRESS_BAR_STYLE
 from src.models import RankedChunk, SourceChunk
 from src.tokenization import TextTokenizer
@@ -360,7 +360,7 @@ class BM25Index(ChunkSearcher):
         The manifest and the file hashes change whenever the indexed
         files, the tokenizer or the chunking change.
         """
-        return fingerprint_files(
+        return DiskCache.fingerprint_files(
             [
                 directory / cls.MANIFEST_FILE_NAME,
                 directory / cls.FILES_FILE_NAME,
