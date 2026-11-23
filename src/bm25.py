@@ -40,6 +40,7 @@ class BM25Scorer:
         term_frequencies: NDArray[np.int32],
         lengths: NDArray[np.int64],
         document_frequencies: NDArray[np.int64],
+        postings: dict[str, NDArray[np.generic]] | None = None,
     ) -> None:
         """Store the counts and prepare the term-by-term lookup.
 
@@ -50,6 +51,8 @@ class BM25Scorer:
             term_frequencies: How often that term occurs in the document.
             lengths: Number of terms of each document.
             document_frequencies: Number of documents containing each term.
+            postings: The term-by-term lookup saved from ``postings``, so
+                it is not rebuilt; built from the counts when ``None``.
         """
         self._vocabulary = vocabulary
         self._term_id_by_term = {
@@ -60,7 +63,25 @@ class BM25Scorer:
         self._term_frequencies = term_frequencies
         self._lengths = lengths
         self._document_frequencies = document_frequencies
-        self._build_postings()
+        self._posting_starts: NDArray[np.generic]
+        self._posting_documents: NDArray[np.generic]
+        self._posting_frequencies: NDArray[np.generic]
+
+        if postings is None:
+            self._build_postings()
+        else:
+            self._posting_starts = postings["posting_starts"]
+            self._posting_documents = postings["posting_documents"]
+            self._posting_frequencies = postings["posting_frequencies"]
+
+    @property
+    def postings(self) -> dict[str, NDArray[np.generic]]:
+        """Return the term-by-term lookup, to be cached and reused."""
+        return {
+            "posting_starts": self._posting_starts,
+            "posting_documents": self._posting_documents,
+            "posting_frequencies": self._posting_frequencies,
+        }
 
     @property
     def document_count(self) -> int:
@@ -300,8 +321,16 @@ class BM25Scorer:
         )
 
     @classmethod
-    def load(cls, directory: Path) -> "BM25Scorer":
+    def load(
+        cls,
+        directory: Path,
+        postings: dict[str, NDArray[np.generic]] | None = None,
+    ) -> "BM25Scorer":
         """Read counts written by ``save``.
+
+        Args:
+            directory: Directory written by ``save``.
+            postings: The cached term-by-term lookup of these counts.
 
         Raises:
             FileNotFoundError: If a file is missing.
@@ -322,6 +351,7 @@ class BM25Scorer:
             document_frequencies=np.load(
                 directory / cls.DOCUMENT_FREQUENCIES_FILE_NAME
             ),
+            postings=postings,
         )
 
     def _build_postings(self) -> None:

@@ -11,7 +11,9 @@ from pathlib import Path
 
 from src.answering import AnswerService, DatasetAnswerer
 from src.api import RagApi
+from src.cache import IndexCache, QueryCache, fingerprint_files
 from src.chunking import Chunker, DocumentationChunker, PythonChunker
+from src.config import DEFAULT_CACHE_DIRECTORY
 from src.dataset import (
     DatasetLoader,
     DatasetSearcher,
@@ -24,7 +26,7 @@ from src.evaluation import RetrievalEvaluator
 from src.generation import QwenAnswerGenerator
 from src.hybrid_search import HybridSearcher
 from src.index_pipeline import IndexingPipeline
-from src.indexing import BM25Index
+from src.indexing import BM25Index, ChunkSearcher
 from src.loader import FileReader, RepositoryLoader
 from src.models import DocumentType
 from src.retrieval import QuestionRetriever, RetrievalMethod
@@ -60,6 +62,16 @@ class Wiring:
         vector index and its queries always use the same model.
         """
         return SentenceTransformerEmbedder()
+
+    @cached_property
+    def index_cache(self) -> IndexCache:
+        """Return the cache of the BM25 index in its ready-to-search form."""
+        return IndexCache(Path(DEFAULT_CACHE_DIRECTORY) / "index")
+
+    @cached_property
+    def query_cache(self) -> QueryCache:
+        """Return the cache of search results and answers."""
+        return QueryCache(Path(DEFAULT_CACHE_DIRECTORY) / "queries")
 
     @cached_property
     def file_reader(self) -> FileReader:
@@ -124,11 +136,13 @@ class Wiring:
         method: RetrievalMethod,
         semantic_directory: Path,
     ) -> QuestionRetriever:
-        """Load the saved index chosen by ``method`` and return its retriever.
+        """Return a retriever over the saved index chosen by ``method``.
 
-        The BM25 index is always loaded: it holds the chunks, and the
-        semantic vectors only number them. The hybrid method ranks with
-        both indexes and fuses their rankings.
+        The index is loaded on the retriever's first cache miss. The BM25
+        index is always loaded: it holds the chunks, and the semantic
+        vectors only number them. The hybrid method ranks with both
+        indexes and fuses their rankings. Cached results are keyed by the
+        method and a fingerprint of the indexes it reads.
 
         Args:
             index_directory: Directory written by the ``index`` command.
@@ -136,13 +150,43 @@ class Wiring:
             semantic_directory: Directory of the semantic index; only read
                 when ``method`` is semantic or hybrid.
         """
+        index_version = BM25Index.version(index_directory)
+
+        if method is not RetrievalMethod.BM25:
+            index_version = fingerprint_files(
+                [
+                    index_directory / BM25Index.MANIFEST_FILE_NAME,
+                    index_directory / BM25Index.FILES_FILE_NAME,
+                    semantic_directory / VectorIndex.MANIFEST_FILE_NAME,
+                ]
+            )
+
+        return QuestionRetriever(
+            load_index=lambda: self._load_index(
+                index_directory, method, semantic_directory
+            ),
+            cache=self.query_cache,
+            cache_scope={
+                "method": method.value,
+                "index_version": index_version,
+            },
+        )
+
+    def _load_index(
+        self,
+        index_directory: Path,
+        method: RetrievalMethod,
+        semantic_directory: Path,
+    ) -> ChunkSearcher:
+        """Load the saved index chosen by ``method``."""
         index = BM25Index.load(
             directory=index_directory,
             tokenizer=self.tokenizer,
+            cache=self.index_cache,
         )
 
         if method is RetrievalMethod.BM25:
-            return QuestionRetriever(index=index)
+            return index
 
         vector_index = VectorIndex.load(
             directory=semantic_directory,
@@ -151,13 +195,11 @@ class Wiring:
         )
 
         if method is RetrievalMethod.SEMANTIC:
-            return QuestionRetriever(index=vector_index)
+            return vector_index
 
-        return QuestionRetriever(
-            index=HybridSearcher(
-                lexical_index=index,
-                semantic_index=vector_index,
-            )
+        return HybridSearcher(
+            lexical_index=index,
+            semantic_index=vector_index,
         )
 
     def dataset_searcher(
@@ -195,6 +237,11 @@ class Wiring:
                 max_new_tokens=settings.max_new_tokens,
                 device=settings.device,
             ),
+            cache=self.query_cache,
+            cache_scope={
+                name: str(value)
+                for name, value in settings.model_dump().items()
+            },
         )
 
     def dataset_answerer(
@@ -226,9 +273,12 @@ class Wiring:
             settings: Model, token budgets and device for the answers.
             project_root: Root that retrieved file paths are relative to.
         """
+        question_retriever = self.question_retriever(
+            index_directory, method, semantic_directory
+        )
+        question_retriever.load()
+
         return RagApi(
-            question_retriever=self.question_retriever(
-                index_directory, method, semantic_directory
-            ),
+            question_retriever=question_retriever,
             answer_service=self.answer_service(settings, project_root),
         )

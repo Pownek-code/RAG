@@ -1,10 +1,13 @@
 """Orchestration of answer generation for search results."""
 
+import json
 import logging
+from collections.abc import Mapping
 from pathlib import Path
 
 from tqdm import tqdm
 
+from src.cache import QueryCache
 from src.config import PROGRESS_BAR_STYLE
 from src.dataset import JsonFileReader, JsonResultsWriter
 from src.generation import AnswerGenerator
@@ -22,21 +25,33 @@ logger = logging.getLogger(__name__)
 
 
 class AnswerService:
-    """Generates grounded answers for retrieved search results."""
+    """Generates grounded answers for retrieved search results.
+
+    With a cache, an answer is reused when the question, the text of every
+    excerpt and the ``cache_scope`` (the generation settings) are all the
+    same; the model is then never loaded.
+    """
 
     def __init__(
         self,
         context_loader: SourceContextLoader,
         generator: AnswerGenerator,
+        cache: QueryCache | None = None,
+        cache_scope: Mapping[str, str] | None = None,
     ) -> None:
         """Store the collaborators used to answer questions.
 
         Args:
             context_loader: Reads the text of retrieved sources.
             generator: Produces the answer from the question and excerpts.
+            cache: Where answers are kept.
+            cache_scope: What answers depend on besides the question and
+                the excerpts: the model and its settings.
         """
         self._context_loader = context_loader
         self._generator = generator
+        self._cache = cache
+        self._cache_scope = dict(cache_scope or {})
 
     def load_model(self) -> None:
         """Load the generation model ahead of the first answer."""
@@ -53,11 +68,25 @@ class AnswerService:
         be read, the generator receives no context.
         """
         excerpts = self._load_excerpts(search_result)
+        key = {
+            "kind": "answer",
+            **self._cache_scope,
+            "question": search_result.question,
+            "excerpts": json.dumps(
+                [excerpt.model_dump() for excerpt in excerpts],
+                sort_keys=True,
+            ),
+        }
+        answer = self._cache.get(key) if self._cache is not None else None
 
-        answer = self._generator.generate(
-            question=search_result.question,
-            excerpts=excerpts,
-        )
+        if answer is None:
+            answer = self._generator.generate(
+                question=search_result.question,
+                excerpts=excerpts,
+            )
+
+            if self._cache is not None:
+                self._cache.put(key, answer)
 
         return MinimalAnswer(
             question_id=search_result.question_id,

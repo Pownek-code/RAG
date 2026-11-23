@@ -7,6 +7,7 @@ from pathlib import Path
 from tqdm import tqdm
 
 from src.bm25 import BM25Scorer
+from src.cache import IndexCache, fingerprint_files
 from src.config import PROGRESS_BAR_STYLE
 from src.models import RankedChunk, SourceChunk
 from src.tokenization import TextTokenizer
@@ -222,12 +223,18 @@ class BM25Index(ChunkSearcher):
         cls,
         directory: Path,
         tokenizer: TextTokenizer,
+        cache: IndexCache | None = None,
     ) -> "BM25Index":
         """Load a saved index.
+
+        The counts are regrouped term by term for searching. With a cache,
+        that lookup is read from it when it was made from this exact
+        index, and saved to it otherwise.
 
         Args:
             directory: Directory written by ``save``.
             tokenizer: Must be the tokenizer the index was built with.
+            cache: Where the ready-to-search lookup is kept.
 
         Raises:
             FileNotFoundError: If the manifest, chunks or counts are
@@ -286,7 +293,12 @@ class BM25Index(ChunkSearcher):
 
         instance = cls(tokenizer=tokenizer)
         instance._chunks = instance._load_chunks(chunks_path)
-        instance._scorer = BM25Scorer.load(index_path)
+        version = cls.version(directory)
+        cached = cache.load(version) if cache is not None else None
+        instance._scorer = BM25Scorer.load(index_path, postings=cached)
+
+        if cache is not None and cached is None:
+            cache.save(version, instance._scorer.postings)
 
         if (
             len(instance._chunks) != manifest["chunk_count"]
@@ -340,6 +352,20 @@ class BM25Index(ChunkSearcher):
                 **PROGRESS_BAR_STYLE,
             )
         ]
+
+    @classmethod
+    def version(cls, directory: Path) -> str:
+        """Return a fingerprint of a saved index, without loading it.
+
+        The manifest and the file hashes change whenever the indexed
+        files, the tokenizer or the chunking change.
+        """
+        return fingerprint_files(
+            [
+                directory / cls.MANIFEST_FILE_NAME,
+                directory / cls.FILES_FILE_NAME,
+            ]
+        )
 
     def _require_scorer(self) -> BM25Scorer:
         """Return the BM25 scorer or fail if there is none."""
