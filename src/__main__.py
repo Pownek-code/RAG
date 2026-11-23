@@ -26,9 +26,8 @@ from src.config import (
     MAX_CHUNK_SIZE,
     MODEL_NAME,
 )
-from src.models import UnansweredQuestion
+from src.models import GenerationSettings, UnansweredQuestion
 from src.retrieval import RetrievalMethod
-from src.settings import GenerationSettings
 from src.wiring import Wiring
 
 

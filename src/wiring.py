@@ -28,9 +28,8 @@ from src.hybrid_search import HybridSearcher
 from src.index_pipeline import IndexingPipeline
 from src.indexing import BM25Index, ChunkSearcher
 from src.loader import FileReader, RepositoryLoader
-from src.models import DocumentType
+from src.models import DocumentType, GenerationSettings
 from src.retrieval import QuestionRetriever, RetrievalMethod
-from src.settings import GenerationSettings
 from src.source_context import SourceContextLoader
 from src.tokenization import CodeAwareTokenizer
 from src.vector_index import VectorIndex
