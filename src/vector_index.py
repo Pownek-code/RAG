@@ -21,12 +21,16 @@ class VectorIndex(ChunkSearcher):
     ``window_starts[i]`` is the first row of chunk ``i``. A chunk scores
     as its best window. Vectors have unit length, so a dot product is a
     cosine similarity.
+
+    The hash of every chunk's embedded text is saved with the vectors, so
+    a later build only embeds the chunks whose text is new.
     """
 
     VECTORS_FILE_NAME = "vectors.npy"
     WINDOW_STARTS_FILE_NAME = "window_starts.npy"
     MANIFEST_FILE_NAME = "manifest.json"
-    FORMAT_VERSION = 2
+    CHUNK_HASHES_FILE_NAME = "chunk_hashes.json"
+    FORMAT_VERSION = 3
 
     def __init__(self, embedder: TextEmbedder) -> None:
         """Create an empty index.
@@ -38,14 +42,31 @@ class VectorIndex(ChunkSearcher):
         self._vectors: NDArray[np.float32] | None = None
         self._window_starts: NDArray[np.int64] | None = None
         self._chunks: list[SourceChunk] = []
+        self._chunk_hashes: list[str] = []
 
     @property
     def chunk_count(self) -> int:
         """Return the number of chunks in the index."""
         return len(self._chunks)
 
-    def build(self, chunks: list[SourceChunk]) -> None:
-        """Embed every window of the chunks, ordered by file and range.
+    def build(
+        self,
+        chunks: list[SourceChunk],
+        reusable: dict[str, NDArray[np.float32]] | None = None,
+    ) -> int:
+        """Embed the windows of the chunks, ordered by file and range.
+
+        A chunk whose text has a vector in ``reusable`` takes those rows
+        as they are; only the other chunks are split and embedded, and the
+        model is not loaded when there are none.
+
+        Args:
+            chunks: The chunks to index.
+            reusable: Window vectors of already embedded chunks, by the
+                hash of their text (see ``reusable_vectors``).
+
+        Returns:
+            The number of chunks that were embedded.
 
         Raises:
             ValueError: If there are no chunks.
@@ -55,21 +76,48 @@ class VectorIndex(ChunkSearcher):
                 "Cannot build an index without source chunks"
             )
 
+        reusable = reusable or {}
         self._chunks = sorted(chunks, key=lambda chunk: chunk.sort_key)
+        self._chunk_hashes = [
+            self._hash(chunk) for chunk in self._chunks
+        ]
         windows: list[str] = []
-        window_starts: list[int] = []
+        window_counts: list[int] = []
 
-        for chunk in self._chunks:
-            window_starts.append(len(windows))
-            windows.extend(
-                self.embedder.split_into_windows(
-                    header=chunk.search_header,
-                    text=chunk.content,
-                )
+        for chunk, chunk_hash in zip(
+            self._chunks, self._chunk_hashes, strict=True
+        ):
+            if chunk_hash in reusable:
+                continue
+
+            chunk_windows = self.embedder.split_into_windows(
+                header=chunk.search_header,
+                text=chunk.content,
             )
+            windows.extend(chunk_windows)
+            window_counts.append(len(chunk_windows))
 
-        self._vectors = self.embedder.embed(windows)
-        self._window_starts = np.array(window_starts, dtype=np.int64)
+        new_rows = iter(
+            np.split(
+                self.embedder.embed(windows),
+                np.cumsum(window_counts)[:-1],
+            )
+            if windows
+            else []
+        )
+        rows = [
+            reusable[chunk_hash]
+            if chunk_hash in reusable
+            else next(new_rows)
+            for chunk_hash in self._chunk_hashes
+        ]
+
+        self._vectors = np.concatenate(rows).astype(np.float32)
+        self._window_starts = np.concatenate(
+            ([0], np.cumsum([len(row) for row in rows])[:-1])
+        ).astype(np.int64)
+
+        return len(window_counts)
 
     def search(
         self,
@@ -112,10 +160,16 @@ class VectorIndex(ChunkSearcher):
         ]
 
     def save(self, directory: Path) -> None:
-        """Write the vectors, window starts and manifest into a directory."""
+        """Write the vectors, window starts, manifest and chunk hashes.
+
+        The chunk hashes are removed first and written last, so a save
+        that is interrupted leaves nothing for a later build to reuse.
+        """
         vectors, window_starts = self._require_vectors()
+        hashes_path = directory / self.CHUNK_HASHES_FILE_NAME
 
         directory.mkdir(parents=True, exist_ok=True)
+        hashes_path.unlink(missing_ok=True)
         np.save(directory / self.VECTORS_FILE_NAME, vectors)
         np.save(directory / self.WINDOW_STARTS_FILE_NAME, window_starts)
 
@@ -132,6 +186,60 @@ class VectorIndex(ChunkSearcher):
             encoding="utf-8",
         ) as file:
             json.dump(manifest, file, indent=2)
+
+        with hashes_path.open(mode="w", encoding="utf-8") as file:
+            json.dump(self._chunk_hashes, file)
+
+    @classmethod
+    def reusable_vectors(
+        cls,
+        directory: Path,
+        embedder: TextEmbedder,
+    ) -> dict[str, NDArray[np.float32]]:
+        """Return the saved window vectors of each chunk, by text hash.
+
+        Nothing is returned when the saved index is missing, damaged,
+        interrupted while saving, or made with another embedder: its
+        vectors could then differ from what ``embedder`` produces.
+        """
+        try:
+            with (directory / cls.MANIFEST_FILE_NAME).open(
+                encoding="utf-8"
+            ) as file:
+                manifest = json.load(file)
+
+            with (directory / cls.CHUNK_HASHES_FILE_NAME).open(
+                encoding="utf-8"
+            ) as file:
+                chunk_hashes = json.load(file)
+
+            vectors = np.load(directory / cls.VECTORS_FILE_NAME)
+            window_starts = np.load(directory / cls.WINDOW_STARTS_FILE_NAME)
+        except (OSError, ValueError):
+            return {}
+
+        if (
+            not isinstance(manifest, dict)
+            or manifest.get("format_version") != cls.FORMAT_VERSION
+            or manifest.get("embedder") != embedder.name
+            or not isinstance(chunk_hashes, list)
+            or vectors.ndim != 2
+            or vectors.dtype != np.float32
+            or not cls._valid_window_starts(
+                window_starts,
+                chunk_count=len(chunk_hashes),
+                window_count=len(vectors),
+            )
+        ):
+            return {}
+
+        return dict(
+            zip(
+                chunk_hashes,
+                np.split(vectors, window_starts[1:]),
+                strict=True,
+            )
+        )
 
     @classmethod
     def load(
@@ -267,6 +375,13 @@ class VectorIndex(ChunkSearcher):
             and np.all(np.diff(window_starts) > 0)
             and window_starts[-1] < window_count
         )
+
+    @staticmethod
+    def _hash(chunk: SourceChunk) -> str:
+        """Return the SHA-256 of the text a chunk is embedded from."""
+        return hashlib.sha256(
+            chunk.searchable_text.encode("utf-8")
+        ).hexdigest()
 
     @staticmethod
     def _fingerprint(chunks: list[SourceChunk]) -> str:

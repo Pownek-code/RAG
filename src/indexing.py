@@ -4,9 +4,9 @@ import json
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-import bm25s
 from tqdm import tqdm
 
+from src.bm25 import BM25Scorer
 from src.config import PROGRESS_BAR_STYLE
 from src.models import RankedChunk, SourceChunk
 from src.tokenization import TextTokenizer
@@ -35,12 +35,17 @@ class BM25Index(ChunkSearcher):
     The searchable text of a chunk is its file path, its context (such
     as the Markdown heading path) and its content, so queries can
     match path and section words as well as the text itself.
+
+    The index also records the content hash of every indexed file and
+    the chunking settings, so a later run can update only the files that
+    changed.
     """
 
     INDEX_DIRECTORY_NAME = "index"
     CHUNKS_FILE_NAME = "chunks.jsonl"
     MANIFEST_FILE_NAME = "manifest.json"
-    FORMAT_VERSION = 2
+    FILES_FILE_NAME = "files.json"
+    FORMAT_VERSION = 3
 
     def __init__(self, tokenizer: TextTokenizer) -> None:
         """Create an empty index.
@@ -49,8 +54,10 @@ class BM25Index(ChunkSearcher):
             tokenizer: Turns text into the terms that are indexed.
         """
         self.tokenizer = tokenizer
-        self._retriever: bm25s.BM25 | None = None
+        self._scorer: BM25Scorer | None = None
         self._chunks: list[SourceChunk] = []
+        self._file_hashes: dict[str, str] = {}
+        self._chunking = ""
 
     @property
     def chunk_count(self) -> int:
@@ -62,8 +69,29 @@ class BM25Index(ChunkSearcher):
         """Return the indexed chunks in index order; do not modify."""
         return self._chunks
 
-    def build(self, chunks: list[SourceChunk]) -> None:
+    @property
+    def file_hashes(self) -> dict[str, str]:
+        """Return the content hash of every indexed file; do not modify."""
+        return self._file_hashes
+
+    @property
+    def chunking(self) -> str:
+        """Return the chunking settings the chunks were made with."""
+        return self._chunking
+
+    def build(
+        self,
+        chunks: list[SourceChunk],
+        file_hashes: dict[str, str],
+        chunking: str,
+    ) -> None:
         """Index the chunks, ordered by file and character range.
+
+        Args:
+            chunks: Every chunk of the repository.
+            file_hashes: The content hash of every file the chunks
+                come from.
+            chunking: The chunking settings the chunks were made with.
 
         Raises:
             ValueError: If there are no chunks.
@@ -74,22 +102,60 @@ class BM25Index(ChunkSearcher):
             )
 
         self._chunks = sorted(chunks, key=lambda chunk: chunk.sort_key)
+        self._scorer = BM25Scorer.from_token_lists(
+            self._tokenize(self._chunks)
+        )
+        self._file_hashes = dict(file_hashes)
+        self._chunking = chunking
 
-        tokenized_corpus = [
-            self.tokenizer.tokenize(chunk.searchable_text)
-            for chunk in tqdm(
-                self._chunks,
-                desc="Tokenizing chunks",
-                unit="chunk",
-                **PROGRESS_BAR_STYLE,
+    def update(
+        self,
+        replaced: dict[str, list[SourceChunk]],
+        file_hashes: dict[str, str],
+    ) -> None:
+        """Replace the chunks of some files and drop deleted files.
+
+        Only the chunks of the replaced files are tokenized; every other
+        chunk keeps its stored counts.
+
+        Args:
+            replaced: The new chunks of every new or changed file.
+            file_hashes: The content hash of every file now in the
+                repository; indexed files missing from it are dropped.
+
+        Raises:
+            ValueError: If no chunk would remain.
+            RuntimeError: If the index was neither built nor loaded.
+        """
+        scorer = self._require_scorer()
+        affected = set(replaced) | (set(self._file_hashes) - set(file_hashes))
+        entries: list[tuple[SourceChunk, int | None]] = [
+            (chunk, document)
+            for document, chunk in enumerate(self._chunks)
+            if chunk.file_path not in affected
+        ]
+        entries.extend(
+            (chunk, None)
+            for chunks in replaced.values()
+            for chunk in chunks
+        )
+
+        if not entries:
+            raise ValueError(
+                "Cannot build an index without source chunks"
             )
+
+        entries.sort(key=lambda entry: entry[0].sort_key)
+        new_chunks = [chunk for chunk, document in entries if document is None]
+        new_terms = iter(self._tokenize(new_chunks))
+        sources: list[int | list[str]] = [
+            document if document is not None else next(new_terms)
+            for _, document in entries
         ]
 
-        self._retriever = bm25s.BM25()
-        self._retriever.index(
-            tokenized_corpus,
-            show_progress=False,
-        )
+        self._scorer = scorer.with_documents(sources)
+        self._chunks = [chunk for chunk, _ in entries]
+        self._file_hashes = dict(file_hashes)
 
     def search(
         self,
@@ -109,7 +175,7 @@ class BM25Index(ChunkSearcher):
             ValueError: If the query is blank or ``top_k`` is not positive.
             RuntimeError: If the index was neither built nor loaded.
         """
-        retriever = self._require_retriever()
+        scorer = self._require_scorer()
 
         if not query.strip():
             raise ValueError("Query cannot be empty")
@@ -122,39 +188,24 @@ class BM25Index(ChunkSearcher):
         if not query_tokens:
             return []
 
-        result_count = min(top_k, len(self._chunks))
-
-        results = retriever.retrieve(
-            [query_tokens],
-            k=result_count,
-            show_progress=False,
-            return_as="tuple",
-        )
-
-        document_ids = results.documents[0]
-        scores = results.scores[0]
-
         return [
-            RankedChunk(
-                chunk=self._chunks[int(document_id)],
-                score=float(score),
-            )
-            for document_id, score in zip(
-                document_ids,
-                scores,
-                strict=True,
-            )
+            RankedChunk(chunk=self._chunks[document], score=score)
+            for document, score in scorer.top_k(query_tokens, top_k)
         ]
 
     def save(self, directory: Path) -> None:
-        """Write the index, chunks and manifest into a directory."""
-        retriever = self._require_retriever()
+        """Write the index, chunks, manifest and file hashes.
+
+        The file hashes are removed first and written last. A save that
+        is interrupted therefore leaves no hashes, and the next run
+        rebuilds everything instead of trusting half-written files.
+        """
+        scorer = self._require_scorer()
+        files_path = directory / self.FILES_FILE_NAME
 
         directory.mkdir(parents=True, exist_ok=True)
-
-        retriever.save(
-            str(directory / self.INDEX_DIRECTORY_NAME)
-        )
+        files_path.unlink(missing_ok=True)
+        scorer.save(directory / self.INDEX_DIRECTORY_NAME)
 
         self._save_chunks(
             directory / self.CHUNKS_FILE_NAME
@@ -162,6 +213,9 @@ class BM25Index(ChunkSearcher):
         self._save_manifest(
             directory / self.MANIFEST_FILE_NAME
         )
+
+        with files_path.open(mode="w", encoding="utf-8") as file:
+            json.dump(self._file_hashes, file, indent=2, sort_keys=True)
 
     @classmethod
     def load(
@@ -176,9 +230,10 @@ class BM25Index(ChunkSearcher):
             tokenizer: Must be the tokenizer the index was built with.
 
         Raises:
-            FileNotFoundError: If the manifest or chunks are missing.
+            FileNotFoundError: If the manifest, chunks or counts are
+                missing.
             ValueError: If the format or tokenizer does not match, or the
-                manifest and chunk file disagree.
+                manifest, chunks and counts disagree.
         """
         manifest_path = directory / cls.MANIFEST_FILE_NAME
         chunks_path = directory / cls.CHUNKS_FILE_NAME
@@ -194,10 +249,20 @@ class BM25Index(ChunkSearcher):
                 f"Indexed chunks not found: {chunks_path}"
             )
 
+        if not index_path.is_dir():
+            raise FileNotFoundError(
+                f"Index term counts not found: {index_path}"
+            )
+
         with manifest_path.open(encoding="utf-8") as file:
             manifest = json.load(file)
 
-        required_keys = {"format_version", "tokenizer", "chunk_count"}
+        required_keys = {
+            "format_version",
+            "tokenizer",
+            "chunk_count",
+            "chunking",
+        }
 
         if (
             not isinstance(manifest, dict)
@@ -221,26 +286,69 @@ class BM25Index(ChunkSearcher):
 
         instance = cls(tokenizer=tokenizer)
         instance._chunks = instance._load_chunks(chunks_path)
-        instance._retriever = bm25s.BM25.load(
-            str(index_path),
-            mmap=True,
-        )
+        instance._scorer = BM25Scorer.load(index_path)
 
-        if len(instance._chunks) != manifest["chunk_count"]:
+        if (
+            len(instance._chunks) != manifest["chunk_count"]
+            or instance._scorer.document_count != manifest["chunk_count"]
+        ):
             raise ValueError(
                 "Index manifest and chunk storage disagree"
             )
 
+        instance._chunking = manifest["chunking"]
+        instance._file_hashes = cls._load_file_hashes(
+            directory / cls.FILES_FILE_NAME,
+            chunks=instance._chunks,
+        )
+
         return instance
 
-    def _require_retriever(self) -> bm25s.BM25:
-        """Return the BM25 engine or fail if there is none."""
-        if self._retriever is None:
+    @staticmethod
+    def _load_file_hashes(
+        file_path: Path,
+        chunks: list[SourceChunk],
+    ) -> dict[str, str]:
+        """Read the file hashes, or return none if they cannot be trusted.
+
+        Without hashes, or with hashes for other files than the chunks
+        come from, the index can still be searched but not updated.
+        """
+        if not file_path.is_file():
+            return {}
+
+        with file_path.open(encoding="utf-8") as file:
+            file_hashes = json.load(file)
+
+        if (
+            not isinstance(file_hashes, dict)
+            or set(file_hashes) != {chunk.file_path for chunk in chunks}
+        ):
+            return {}
+
+        return file_hashes
+
+    def _tokenize(self, chunks: list[SourceChunk]) -> list[list[str]]:
+        """Return the terms of every chunk's searchable text."""
+        return [
+            self.tokenizer.tokenize(chunk.searchable_text)
+            for chunk in tqdm(
+                chunks,
+                desc="Tokenizing chunks",
+                unit="chunk",
+                disable=not chunks,
+                **PROGRESS_BAR_STYLE,
+            )
+        ]
+
+    def _require_scorer(self) -> BM25Scorer:
+        """Return the BM25 scorer or fail if there is none."""
+        if self._scorer is None:
             raise RuntimeError(
                 "The BM25 index has not been built or loaded"
             )
 
-        return self._retriever
+        return self._scorer
 
     def _save_chunks(self, file_path: Path) -> None:
         """Write one chunk per line as JSON."""
@@ -269,11 +377,12 @@ class BM25Index(ChunkSearcher):
         return chunks
 
     def _save_manifest(self, file_path: Path) -> None:
-        """Write the format version, tokenizer name and chunk count."""
+        """Write the format, tokenizer, chunk count and chunking."""
         manifest = {
             "format_version": self.FORMAT_VERSION,
             "tokenizer": self.tokenizer.name,
             "chunk_count": len(self._chunks),
+            "chunking": self._chunking,
         }
 
         with file_path.open(
